@@ -1,0 +1,14 @@
+factor,log,t_ha
+Calor (días >32 °C),-0.02062,2.275
+Lluvia del arranque (0-3 meses),-0.00335,0.37
+Cosecha mecanizada,-0.00793,0.874
+Corte anterior mecanizado,-0.00444,0.489
+Corte anterior en suelo húmedo,-0.00571,0.63
+Incendio,0.00039,-0.043
+Edad de cosecha,0.01575,-1.737
+Número de corte,0.00519,-0.572
+Variedades,-0.00355,0.391
+Agua al final del ciclo (sequía y riego),-0.01468,1.619
+Nivel freático,0.00166,-0.184
+"Labores (roturación, malezas, fertilización)",0.00784,-0.864
+Sin explicar (golpe común del año y ruido),-0.04151,4.579

@@ -1,0 +1,11 @@
+factor,log,t_ha
+Calor (días >32 °C),-0.0223,2.459
+Lluvia del arranque (0-3 meses),-0.00492,0.542
+Cosecha mecánica,-0.00485,0.535
+Incendio,0.0004,-0.044
+Edad de cosecha,0.01454,-1.604
+Número de corte,0.00586,-0.647
+Variedades,-0.00428,0.472
+Agua al final del ciclo (sequía y riego),-0.01114,1.229
+"Labores (roturación, malezas, fertilización)",-0.0036,0.397
+Sin explicar (golpe común del año y ruido),-0.04076,4.495

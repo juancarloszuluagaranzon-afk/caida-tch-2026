@@ -1,0 +1,16 @@
+{
+  "v": 4,
+  "createdOnFiles": {"v": 1, "at": "2026-10-24T14:00:00Z"},
+  "lists": "css",
+  "title": "Caída del TCH Riopaila 2026 — Gerencia",
+  "order": ["cover", "cifras", "puente", "cascada", "tipos", "mecanizada", "satelite", "alerta", "prueba", "segmentos", "cierre"],
+  "sections": {
+    "s1": {"description": "Qué pasó: la caída frente a la historia y frente al presupuesto", "start": "cover"},
+    "s2": {"description": "Qué explica la caída, variable por variable y por tipo de factor", "start": "cascada"},
+    "s5": {"description": "La cosecha mecanizada y la cepa, en la báscula y desde el satélite, con la alerta 2027", "start": "mecanizada"},
+    "s3": {"description": "La prueba: el modelo predice lo que no vio", "start": "prueba"},
+    "s4": {"description": "Qué está demostrado y qué proponemos", "start": "cierre"}
+  },
+  "faces": {},
+  "designSystems": []
+}

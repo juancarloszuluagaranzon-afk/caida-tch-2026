@@ -1,0 +1,38 @@
+{
+ "pesos": {
+  "title": "Peso de cada variable",
+  "description": "Para cada variable medida: su grupo (no controlable, agronómico y operativo, flujo de caja) y el efecto que le da el modelo de 7.433 cosechas 2011-2026, con su p."
+ },
+ "suertes": {
+  "title": "Caída por suerte 2026",
+  "description": "Cada una de las 317 cosechas de Riopaila de enero a septiembre de 2026 (G&P): hacienda, zona, zona agroecológica, variedad, tipo de cosecha y del corte anterior, TCH real, TCH histórico 2020-25 de la misma suerte, caída, PPTO 2026 del Maestro de Suertes y las t/ha que quitó (positivo) o dio (negativo) cada variable medida, con lo que queda «Sin explicar». Sale de tablero_datos.py (versión 3, sin calificaciones)."
+ },
+ "validacion_2026": {
+  "title": "2026 con un modelo que no vio 2026",
+  "description": "Modelo ajustado solo con cosechas 2011-2025 y aplicado a lo cosechado en enero-septiembre de 2026: cuánto quitó cada factor (log y t/ha; positivo en t/ha = quitó) y lo que queda sin explicar. Sale de validacion_modelo.py."
+ },
+ "validacion_anual": {
+  "title": "Cada año predicho sin verlo",
+  "description": "Para cada año 2013-2026, el modelo se ajusta sin ese año y predice cuánto cambió el TCH de cada suerte frente a su promedio de los seis años anteriores (ajustado por mes de cosecha). real, predicho y sin_explicar en %, ponderados por área. 2026 = enero a septiembre. Sale de validacion_modelo.py."
+ },
+ "validacion_metodos": {
+  "title": "Suerte por suerte",
+  "description": "R² fuera de muestra del modelo frente a la caída de cada suerte: sin haber visto 2026 y sin haber visto esas suertes de 2026. Sale de validacion_modelo.py."
+ },
+ "validacion_segmentos": {
+  "title": "Caída 2026 por segmento, real y predicha",
+  "description": "Cambio del TCH 2026 frente a la historia de cada suerte (%, ponderado por área) por zona, zona agroecológica, variedad, tipo de cosecha y mes: lo que pasó (real) y lo que predijo el modelo ajustado sin 2026 (predicho); predicho_con_anio suma el efecto común del año. Sale de validacion_modelo.py."
+ },
+ "mecanizada_anual": {
+  "title": "Cosecha mecanizada por año",
+  "description": "% del área cosechada con máquina por año y diferencia de TCH mecanizada frente a manual (misma suerte)."
+ },
+ "satelite_resumen": {
+  "title": "Rebrote visto por satélite",
+  "description": "Cambio del NDVI, NDMI y rebrote ralo tras el primer corte mecanizado frente al control, a 60, 100 y 150 días; cosecha 2026 y alerta 2027."
+ },
+ "alerta_2027": {
+  "title": "Alerta 2027 por suerte",
+  "description": "Suertes con su primera cosecha mecanizada en 2026: cambio del NDVI y del rebrote ralo frente a su último corte manual."
+ }
+}

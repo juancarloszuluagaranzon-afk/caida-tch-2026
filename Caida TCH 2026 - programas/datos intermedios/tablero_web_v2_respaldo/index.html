@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Caída del TCH Riopaila 2026</title>
+<style>
+  /* Fichas de diseño que el tablero espera (las mismas que da el tablero de claude.ai), claro y oscuro */
+  :root {
+    color-scheme: light dark;
+    --color-bg: #F7F6F4; --color-panel: #FFFFFF; --color-fg: #1A1A1A; --color-fg-muted: #5F5F61;
+    --color-border-line: #E4E1DD; --color-bad: #B91C1C; --color-ok: #15803D;
+    --cds-chart-muted: #C2BEB8; --cds-chart-grid: #ECE9E5; --cds-chart-axis: #A8A29E; --cds-chart-reference: #A8A29E;
+    --cds-surface-popover: #FFFFFF; --cds-border: #E4E1DD; --cds-shadow-popover: 0 6px 20px rgba(0, 0, 0, 0.12);
+    --cds-text-secondary: #707072;
+    --cds-font-size-caption: 0.8125rem; --cds-font-size-body: 0.9375rem; --cds-font-size-heading: 1.0625rem; --cds-font-size-title: 1.75rem;
+    --cds-font-weight-medium: 600;
+    --cds-gap-xs: 0.25rem; --cds-gap-sm: 0.5rem; --cds-gap-md: 0.75rem; --cds-gap-lg: 1.25rem;
+    --cds-pad-xs: 0.25rem; --cds-pad-sm: 0.5rem; --cds-pad-md: 0.75rem; --cds-pad-lg: 1rem; --cds-pad-xl: 1.5rem;
+    --cds-radius: 8px; --cds-dur-slow: 300ms;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-bg: #161514; --color-panel: #1F1E1C; --color-fg: #F2F1EF; --color-fg-muted: #A8A6A2;
+      --color-border-line: #353330; --color-bad: #F87171; --color-ok: #4ADE80;
+      --cds-chart-muted: #5C5955; --cds-chart-grid: #2C2A28; --cds-chart-axis: #6E6A65; --cds-chart-reference: #6E6A65;
+      --cds-surface-popover: #262522; --cds-border: #3A3835; --cds-shadow-popover: 0 6px 20px rgba(0, 0, 0, 0.5);
+      --cds-text-secondary: #A8A6A2;
+    }
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--color-bg); color: var(--color-fg); font-family: Tahoma, Verdana, Geneva, sans-serif; }
+  #dash-root { max-width: 1280px; margin: 0 auto; padding: 24px clamp(16px, 4vw, 40px) 32px; }
+  .dash-skeleton { color: transparent !important; border-radius: 6px; min-height: 1em;
+    background: linear-gradient(90deg, var(--cds-chart-grid), var(--color-border-line), var(--cds-chart-grid)); }
+  .pie { max-width: 1280px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 32px; font-size: 0.8125rem; color: var(--color-fg-muted); }
+  :focus-visible { outline: 2px solid #DC2626; outline-offset: 2px; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+  // Lo mínimo del entorno de tableros de claude.ai que usa la página: datos de los CSV, cálculos, filtros y enlaces.
+  (() => {
+    const DEF = { cosecha: null, mes: null, ocultas: [], suerte: null, variedad: null, za: null, zona: null };
+    const FILES = {
+      suertes: 'data/suertes_caida_tch.csv', pesos: 'data/pesos_variables.csv',
+      validacion_anual: 'data/validacion_anual.csv', validacion_2026: 'data/validacion_2026.csv',
+      validacion_segmentos: 'data/validacion_segmentos.csv', validacion_metodos: 'data/validacion_metodos.csv',
+    };
+    const copia = (o) => JSON.parse(JSON.stringify(o));
+    const st = { data: {}, calcs: {}, cache: {}, cbs: [], params: copia(DEF) };
+    for (const id of Object.keys(FILES)) st.data[id] = { status: 'loading' };
+    let pendiente = false;
+    const avisar = () => { st.cache = {}; for (const cb of st.cbs) { try { cb(); } catch (e) { console.error(e); } } };
+    const luego = () => { if (!pendiente) { pendiente = true; requestAnimationFrame(() => { pendiente = false; avisar(); }); } };
+    window.dash = {
+      colors: ['#DC2626', '#FEB811', '#8A8A8C', '#991B1B', '#57534E', '#F59E0B', '#A8A29E', '#7F1D1D'],
+      calc(id, o) { st.calcs[id] = o; },
+      data(id) {
+        if (st.data[id]) return st.data[id];
+        const c = st.calcs[id];
+        if (!c) return { status: 'loading' };
+        if (st.cache[id]) return st.cache[id];
+        const ins = c.inputs.map((i) => dash.data(i));
+        if (ins.some((d) => d.status === 'error')) return { status: 'error' };
+        if (ins.some((d) => d.status !== 'ok')) return { status: 'loading' };
+        return (st.cache[id] = { status: 'ok', data: c.fn(...ins.map((d) => d.data)) });
+      },
+      onData(cb) { st.cbs.push(cb); luego(); },
+      params() { return st.params; },
+      setParams(p) { Object.assign(st.params, p); avisar(); },
+      resetParams() { st.params = copia(DEF); avisar(); },
+      setLink(n) { history.replaceState(null, '', '#' + n); },
+      refresh() {},
+    };
+    window.addEventListener('DOMContentLoaded', async () => {
+      await Promise.all(Object.entries(FILES).map(async ([id, f]) => {
+        try {
+          const r = await fetch(f);
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          st.data[id] = { status: 'ok', data: d3.csvParse(await r.text()) };
+        } catch (e) {
+          st.data[id] = { status: 'error', message: String(e) };
+        }
+      }));
+      avisar();
+    });
+  })();
+</script>
+</head>
+<body>
+<main id="dash-root">
+<style>
+  /* Imagen de Riopaila Agrícola (sitio corporativo): Tahoma, rojo #991B1B → #DC2626, amarillo #FEB811, gris #707072 */
+  .ct { --rp-rojo-oscuro: #991B1B; --rp-rojo: #DC2626; --rp-amarillo: #FEB811; --rp-gris: #8A8A8C;
+    display: flex; flex-direction: column; gap: var(--cds-gap-lg); font-family: Tahoma, Verdana, Geneva, sans-serif; }
+  .ct-head { display: flex; flex-direction: column; gap: var(--cds-gap-md); }
+  .ct-band { display: flex; align-items: center; gap: var(--cds-gap-lg); padding: var(--cds-pad-lg) var(--cds-pad-xl);
+    background: linear-gradient(90deg, var(--rp-rojo-oscuro), var(--rp-rojo)); border-bottom: 6px solid var(--rp-amarillo);
+    border-radius: var(--cds-radius); color: #FFFFFF; }
+  .ct-logo { width: 3.4rem; height: auto; flex: none; }
+  .ct-band-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .ct-eyebrow { margin: 0; font-size: var(--cds-font-size-caption); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rp-amarillo); }
+  .ct-head h1 { margin: 0; font-family: inherit; font-weight: 700; font-size: var(--cds-font-size-title); line-height: 1.15; text-wrap: balance; color: #FFFFFF; }
+  .ct-sub { margin: 0; color: #FDE7E7; font-size: var(--cds-font-size-caption); }
+  .ct-frase { margin: 0; font-size: var(--cds-font-size-body); max-width: 75ch; line-height: 1.5; }
+  .ct-frase b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .ct-tabs { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); border-bottom: 1px solid var(--color-border-line); }
+  .ct-tab { font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg-muted); background: none; border: 0;
+    border-bottom: 2px solid transparent; padding: var(--cds-pad-xs) var(--cds-pad-sm); cursor: pointer; }
+  .ct-tab[aria-selected=true] { color: var(--color-fg); border-bottom: 3px solid var(--rp-rojo); font-weight: 700; }
+  .ct-page { display: flex; flex-direction: column; gap: var(--cds-gap-lg); }
+  .ct-controls { position: relative; display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: flex-end; }
+  .ct-f { display: flex; flex-direction: column; gap: 2px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-width: 0; }
+  .ct-f select, .ct-btn, .ct-chip, .ct-buscar, .ct-vars > summary {
+    font: inherit; font-size: var(--cds-font-size-caption); color: var(--color-fg); background: var(--color-panel);
+    border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-xs) var(--cds-pad-sm); max-width: 100%;
+  }
+  .ct-btn, .ct-chip { cursor: pointer; }
+  .ct-chip { border-color: var(--color-fg-muted); }
+  .ct-vars > summary { list-style: none; cursor: pointer; }
+  .ct-vars > summary::-webkit-details-marker { display: none; }
+  .ct-vars[open] > summary { border-color: var(--color-fg-muted); }
+  .ct-vars-box { position: absolute; left: 0; top: calc(100% + 4px); z-index: 3; width: min(100%, 30rem); max-height: 26rem; overflow: auto;
+    background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover);
+    padding: var(--cds-pad-md); display: flex; flex-direction: column; gap: var(--cds-gap-sm); font-size: var(--cds-font-size-caption); }
+  .ct-vars-q { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); }
+  .ct-vars-g { display: flex; flex-direction: column; gap: 2px; }
+  .ct-vars-g > label { font-weight: var(--cds-font-weight-medium); }
+  .ct-vars-l { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 2px var(--cds-gap-sm); padding-left: var(--cds-pad-md); }
+  .ct-vars label { display: flex; align-items: center; gap: var(--cds-gap-xs); cursor: pointer; }
+  .ct-vars i { width: 0.6rem; height: 0.6rem; border-radius: 2px; display: inline-block; flex: none; }
+  .ct-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); gap: var(--cds-gap-md); }
+  .ct-kpi { background: var(--color-panel); border: 1px solid var(--color-border-line); border-top: 4px solid var(--rp-rojo); border-radius: var(--cds-radius);
+    padding: var(--cds-pad-md); display: flex; flex-direction: column; gap: var(--cds-gap-xs); min-width: 0; }
+  .ct-kpi-l { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .ct-kpi-v { font-family: inherit; font-weight: 700; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; }
+  .ct-kpi-s { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .ct-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--cds-gap-md); }
+  .ct-card { position: relative; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius);
+    padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
+  .ct-card h2 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+  .ct-card h3 { margin: 0; font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+  .ct-card-h { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm); align-items: center; justify-content: space-between; }
+  .ct-note { margin: 0; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); max-width: 80ch; }
+  .ct-text { margin: 0; font-size: var(--cds-font-size-body); line-height: 1.55; max-width: 78ch; }
+  .ct-list { margin: 0; padding-left: 1.2rem; font-size: var(--cds-font-size-body); line-height: 1.55; max-width: 78ch; display: flex; flex-direction: column; gap: var(--cds-gap-xs); }
+  .ct-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm) var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .ct-legend span { display: inline-flex; align-items: center; gap: var(--cds-gap-xs); }
+  .ct-legend i { width: 0.75rem; height: 0.75rem; border-radius: 3px; display: inline-block; }
+  .ct-chart { min-height: 14rem; }
+  .ct-chart svg { display: block; }
+  .ct-msg { min-height: inherit; display: flex; align-items: center; justify-content: center; text-align: center;
+    color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); padding: var(--cds-pad-md); }
+  .ct-fail::before { content: ""; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--color-bad); margin-right: var(--cds-gap-xs); }
+  .ct-tip { position: absolute; z-index: 2; pointer-events: none; max-width: 18rem; background: var(--cds-surface-popover);
+    border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover);
+    padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); line-height: 1.4; }
+  .ct-tip .ct-tip-k { color: var(--cds-text-secondary); }
+  .ct-tablebox { max-height: 34rem; overflow: auto; }
+  .ct-t { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .ct-t th { position: sticky; top: 0; z-index: 1; background: var(--color-panel); text-align: left; font-weight: var(--cds-font-weight-medium);
+    border-bottom: 1px solid var(--color-border-line); padding: 0; }
+  .ct-t th button, .ct-t th span { display: block; font: inherit; color: var(--color-fg-muted); background: none; border: 0; padding: var(--cds-pad-xs) var(--cds-pad-sm);
+    width: 100%; text-align: inherit; }
+  .ct-t th button { cursor: pointer; }
+  .ct-t th[aria-sort] button { color: var(--color-fg); }
+  .ct-t td { padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+  .ct-t .n { text-align: right; }
+  .ct-t .h-m { white-space: nowrap; }
+  .ct-sel tbody tr { cursor: pointer; }
+  .ct-sel tbody tr:hover { background: color-mix(in srgb, var(--color-fg) 6%, transparent); }
+  .ct-sel tbody tr.on { background: color-mix(in srgb, var(--color-fg) 12%, transparent); }
+  .ct-t tr.off td { opacity: 0.4; }
+  .ct-t tr.dest td { font-weight: 600; }
+  .ct-bar { display: inline-block; height: 0.5rem; border-radius: 4px; background: var(--color-bad); opacity: 0.55; vertical-align: middle; margin-left: var(--cds-gap-xs); }
+  [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+  [data-dash-source-state=empty] { color: transparent; }
+  @media (max-width: 40rem) { .ct-hide-n { display: none; } }
+</style>
+
+<div class="ct">
+  <header class="ct-head">
+    <div class="ct-band" id="ct-banda">
+      <img class="ct-logo" alt="Riopaila Agrícola" src="data:image/png;base64,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">
+      <div class="ct-band-t">
+        <p class="ct-eyebrow">Riopaila Agrícola · Planta Riopaila</p>
+        <h1 id="ct-titulo">Caída del TCH Riopaila 2026</h1>
+        <p class="ct-sub">Cosechas de enero a septiembre de 2026 (G&amp;P), cada suerte frente a lo que daba en 2020-25 · matriz ponderada</p>
+      </div>
+    </div>
+    <p class="ct-frase dash-skeleton" id="ct-frase" data-source="suertes suerte_variable">—</p>
+  </header>
+
+  <nav class="ct-tabs" role="tablist" aria-label="Páginas">
+    <button type="button" class="ct-tab" role="tab" id="tab-caida" data-page="caida" aria-selected="true">Caída por variable</button>
+    <button type="button" class="ct-tab" role="tab" id="tab-puente" data-page="puente" aria-selected="false">Puente al presupuesto</button>
+    <button type="button" class="ct-tab" role="tab" id="tab-validacion" data-page="validacion" aria-selected="false">¿El modelo explica la caída?</button>
+    <button type="button" class="ct-tab" role="tab" id="tab-metodo" data-page="metodo" aria-selected="false">Método</button>
+  </nav>
+
+  <div class="ct-controls" id="ct-filtros">
+    <label class="ct-f"><span>Mes de cosecha</span>
+      <select id="f-mes">
+        <option value="">Todos</option>
+        <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+        <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+        <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+      </select>
+    </label>
+    <label class="ct-f"><span>Zona</span><select id="f-zona" data-source="suertes"></select></label>
+    <label class="ct-f"><span>Zona agroecológica</span><select id="f-za" data-source="suertes"></select></label>
+    <label class="ct-f"><span>Variedad</span><select id="f-variedad" data-source="suertes"></select></label>
+    <label class="ct-f"><span>Cosecha</span><select id="f-cosecha" data-source="suertes"></select></label>
+    <details class="ct-vars" id="ct-vars">
+      <summary id="ct-vars-sum">Variables: todas</summary>
+      <div class="ct-vars-box" id="ct-vars-box" data-source="pesos"></div>
+    </details>
+    <button type="button" class="ct-chip" id="ct-suerte" hidden></button>
+    <button type="button" class="ct-btn" id="ct-reset">Restablecer</button>
+  </div>
+
+  <!-- ============================================================ 1. caída por variable -->
+  <section class="ct-page" id="caida" data-page="caida">
+    <div class="ct-kpis" id="ct-kpis" aria-label="Resumen" data-source="suertes">
+      <div class="ct-kpi"><span class="ct-kpi-l">TCH histórico 2020-25</span><span class="ct-kpi-v dash-skeleton" id="k-hist">—</span><span class="ct-kpi-s">t/ha que daban esas suertes</span></div>
+      <div class="ct-kpi"><span class="ct-kpi-l">TCH real 2026</span><span class="ct-kpi-v dash-skeleton" id="k-real">—</span><span class="ct-kpi-s">t/ha cosechadas</span></div>
+      <div class="ct-kpi"><span class="ct-kpi-l">Caída</span><span class="ct-kpi-v dash-skeleton" id="k-caida">—</span><span class="ct-kpi-s"><span id="k-pct">—</span> del histórico</span></div>
+      <div class="ct-kpi"><span class="ct-kpi-l">Toneladas que no se cosecharon</span><span class="ct-kpi-v dash-skeleton" id="k-ton">—</span><span class="ct-kpi-s">caída × área</span></div>
+      <div class="ct-kpi"><span class="ct-kpi-l">Suertes con historia</span><span class="ct-kpi-v dash-skeleton" id="k-n">—</span><span class="ct-kpi-s"><span id="k-area">—</span> ha · de <span id="k-tot">—</span> en el filtro</span></div>
+    </div>
+
+    <section class="ct-card" id="ct-cascada">
+      <div class="ct-card-h"><h2>Del TCH histórico al real, variable por variable</h2></div>
+      <p class="ct-note">Cada barra mueve el TCH: hacia la izquierda lo que esa variable quitó, hacia la derecha lo que dio. Las variables que mueven menos de 0,05 t/ha van juntas, y las que oculte en «Variables» se suman en una barra gris, así la cascada siempre llega al TCH real. Pase el cursor sobre una barra para ver cómo se midió.</p>
+      <div class="ct-legend" id="ct-leyenda" aria-hidden="true"></div>
+      <div class="ct-chart" id="ct-puente" data-source="suerte_variable suertes"></div>
+      <div class="ct-tip" id="ct-tip1" hidden></div>
+    </section>
+
+    <div class="ct-grid">
+      <section class="ct-card" id="ct-grupos-card">
+        <h2>Por grupo de variables</h2>
+        <p class="ct-note">Cuánto movió el TCH cada grupo, en t/ha. Negativo es lo que quitó.</p>
+        <div class="ct-chart" id="ct-grupos" data-source="suerte_variable"></div>
+        <div class="ct-tip" id="ct-tip2" hidden></div>
+      </section>
+      <section class="ct-card" id="ct-pesos-card">
+        <h2>Cómo pesa cada variable</h2>
+        <p class="ct-note">Las variables con dato medido pesan lo que dice el modelo de cosechas 2011-2026. Las que solo tiene la matriz se miden frente a la suerte promedio de 2026: dicen qué suertes castigan, pero en el total suman cero.</p>
+        <div class="ct-tablebox">
+          <table class="ct-t" id="ct-pesos" data-source="pesos" data-row-key="variable">
+            <thead><tr>
+              <th data-field="variable"><span>Variable</span></th>
+              <th data-field="grupo" class="ct-hide-n"><span>Grupo</span></th>
+              <th data-field="efecto"><span>Efecto medido</span></th>
+              <th data-field="nota5_vs_1_tha" class="n"><span>Nota 5 vs 1 (t/ha)</span></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <section class="ct-card" id="ct-suertes-card">
+      <div class="ct-card-h">
+        <h2>Suertes</h2>
+        <input type="search" class="ct-buscar" id="ct-buscar" placeholder="Buscar suerte, variedad o factor" aria-label="Buscar suerte, variedad o factor">
+      </div>
+      <p class="ct-note">Clic en una suerte para ver su propia cascada arriba. «Lo que más quitó» cuenta solo las variables visibles; si es «Sin explicar», ninguna variable explica lo que pasó en esa suerte y es para mirarla en campo.</p>
+      <div class="ct-tablebox">
+        <table class="ct-t ct-sel" id="ct-tabla" data-source="suerte_variable" data-row-key="clave,variable">
+          <thead><tr>
+            <th data-field="clave"><button type="button">Suerte</button></th>
+            <th data-field="zona_agroecologica" class="ct-hide-n"><button type="button">Zona agroec.</button></th>
+            <th data-field="variedad" class="ct-hide-n"><button type="button">Variedad</button></th>
+            <th data-field="cosecha" class="ct-hide-n"><button type="button">Cosecha</button></th>
+            <th data-field="area" class="n ct-hide-n"><button type="button">Área (ha)</button></th>
+            <th data-field="tch_hist" class="n"><button type="button">TCH 2020-25</button></th>
+            <th data-field="tch_real" class="n"><button type="button">TCH real</button></th>
+            <th data-field="caida" class="n"><button type="button">Caída (t/ha)</button></th>
+            <th data-field="variable"><button type="button">Lo que más quitó</button></th>
+            <th data-field="t_ha" class="n"><button type="button">Quitó (t/ha)</button></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <!-- ============================================================ 2. puente al presupuesto -->
+  <section class="ct-page" id="puente" data-page="puente" hidden>
+    <p class="ct-text">La brecha contra el presupuesto tiene dos partes. Del presupuesto al TCH que esas mismas suertes daban en 2020-25 no hay causa de campo que explicar: es presupuesto por encima de la historia. Solo del histórico al real hay caída, y esa es la que reparte la página «Caída por variable». Se muestran los dos presupuestos que hay, en la misma escala, para las suertes del filtro.</p>
+    <div class="ct-grid">
+      <section class="ct-card" id="ct-puente-af">
+        <h2>Presupuesto del AgroFactors</h2>
+        <p class="ct-note">El de la matriz «rio matriz» (hoja GYP (2)), enero a septiembre.</p>
+        <p class="ct-frase dash-skeleton" id="ct-frase-af" data-source="suertes">—</p>
+        <div class="ct-chart" id="ct-chart-af" data-source="suertes"></div>
+        <div class="ct-tip" id="ct-tip-af" hidden></div>
+      </section>
+      <section class="ct-card" id="ct-puente-base">
+        <h2>Presupuesto de la base de maduración</h2>
+        <p class="ct-note">El de la validación de la base de maduración; solo trae enero a agosto.</p>
+        <p class="ct-frase dash-skeleton" id="ct-frase-base" data-source="suertes">—</p>
+        <div class="ct-chart" id="ct-chart-base" data-source="suertes"></div>
+        <div class="ct-tip" id="ct-tip-base" hidden></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============================================================ 3. validación -->
+  <section class="ct-page" id="validacion" data-page="validacion" hidden>
+    <p class="ct-text">Para saber si el modelo explica la caída y no solo la reparte, se le pide predecir lo que no vio: años enteros que se dejan por fuera del ajuste, el 2026 entrenándolo solo con 2011-2025, y en qué zonas, zonas agroecológicas y variedades cayó más. Todas las pruebas usan la anomalía de cada suerte: su TCH, ajustado por el mes de cosecha, frente a su propio promedio de los seis años anteriores.</p>
+    <div class="ct-kpis" aria-label="Resultados de la validación">
+      <div class="ct-kpi"><span class="ct-kpi-l">Explica de la caída 2026 (con los datos de 2026)</span><span class="ct-kpi-v dash-skeleton" data-source="val_muestra" data-field="explica_pct" data-row="0">—</span><span class="ct-kpi-s">lo que no queda en «sin explicar»</span></div>
+      <div class="ct-kpi"><span class="ct-kpi-l">Predice de la caída 2026 sin haber visto 2026</span><span class="ct-kpi-v dash-skeleton" data-source="val_fuera" data-field="explica_pct" data-row="0">—</span><span class="ct-kpi-s">predijo <span data-source="val_fuera" data-field="predicho_pct" data-row="0">—</span> de <span data-source="val_fuera" data-field="real_pct" data-row="0">—</span></span></div>
+      <div class="ct-kpi"><span class="ct-kpi-l">Años 2013-2026 predichos sin verlos</span><span class="ct-kpi-v dash-skeleton" data-source="val_anios" data-field="correlacion" data-row="0">—</span><span class="ct-kpi-s">correlación real-predicho; sentido acertado en <span data-source="val_anios" data-field="aciertos" data-row="0">—</span> de <span data-source="val_anios" data-field="anios" data-row="0">—</span></span></div>
+      <div class="ct-kpi"><span class="ct-kpi-l">AgroFactors sin la nota circular</span><span class="ct-kpi-v dash-skeleton" data-source="validacion_metodos" data-field="r2" data-where="metodo=Calificaciones%201-3-5%20sin%20la%20de%20variedad&amp;objetivo=Brecha%20frente%20al%20presupuesto%20(AgroFactors)">—</span><span class="ct-kpi-s">R² fuera de muestra en su propio objetivo</span></div>
+    </div>
+
+    <section class="ct-card" id="ct-val-anios">
+      <h2>Cada año, predicho por un modelo que no lo vio</h2>
+      <p class="ct-note">Para cada año se ajusta el modelo sin ese año (calor, lluvia del arranque, cosecha mecánica, incendio, edad, corte y variedad) y se predice cuánto se movió el TCH frente a los seis años anteriores. Acierta el sentido de todos los años grandes, pero predice menos de lo que pasó: el resto es el golpe común de cada año que estas variables no miden (solo hay dos estaciones de clima para toda la zona).</p>
+      <div class="ct-legend" id="ct-leg-anios" aria-hidden="true"></div>
+      <div class="ct-chart" id="ct-anios" data-source="validacion_anual"></div>
+      <div class="ct-tip" id="ct-tip4" hidden></div>
+    </section>
+
+    <section class="ct-card" id="ct-val-seg">
+      <div class="ct-card-h">
+        <h2>¿Ubica dónde cayó más? 2026 sin haber visto 2026</h2>
+        <label class="ct-f"><span>Por</span>
+          <select id="f-dim">
+            <option value="Zona">Zona</option><option value="Zona agroecológica">Zona agroecológica</option>
+            <option value="Variedad">Variedad</option><option value="Cosecha">Tipo de cosecha</option><option value="Mes">Mes de cosecha</option>
+          </select>
+        </label>
+      </div>
+      <p class="ct-frase" id="ct-seg-frase" data-source="validacion_segmentos">—</p>
+      <div class="ct-legend" id="ct-leg-seg" aria-hidden="true"></div>
+      <div class="ct-chart" id="ct-seg" data-source="validacion_segmentos"></div>
+      <div class="ct-tip" id="ct-tip5" hidden></div>
+    </section>
+
+    <div class="ct-grid">
+      <section class="ct-card" id="ct-val-fuera">
+        <h2>Cómo reparte 2026 el modelo que no vio 2026</h2>
+        <p class="ct-note">Ajustado solo con 2011-2025 y aplicado a lo cosechado en 2026. La cosecha mecánica casi no aparece: en 2026 rindió mucho peor que en los años anteriores, y eso solo se ve con los datos de 2026.</p>
+        <div class="ct-tablebox">
+          <table class="ct-t" id="ct-tabla-fuera" data-source="validacion_2026" data-row-key="factor">
+            <thead><tr><th data-field="factor"><span>Factor</span></th><th data-field="t_ha" class="n"><span>Quitó (t/ha)</span></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="ct-card" id="ct-val-metodos">
+        <h2>Suerte por suerte: nuestro modelo frente a las notas 1-3-5</h2>
+        <p class="ct-note">R² en suertes que cada método no usó para ajustarse (1 = acierta todo, 0 = no mejora el promedio). Una suerte sola varía mucho por cosas que nadie mide; lo que importa es la comparación.</p>
+        <div class="ct-tablebox">
+          <table class="ct-t" id="ct-tabla-metodos" data-source="validacion_metodos" data-row-key="metodo,objetivo">
+            <thead><tr><th data-field="metodo"><span>Método</span></th><th data-field="objetivo" class="ct-hide-n"><span>Qué predice</span></th><th data-field="r2" class="n"><span>R²</span></th><th data-field="nota" class="ct-hide-n"><span>Cómo se probó</span></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ============================================================ 4. método -->
+  <section class="ct-page" id="metodo" data-page="metodo" hidden>
+    <p class="ct-text">El método completo, las pruebas y cómo actualizarlo cada mes están en el documento para el equipo: <a href="https://claude.ai/artifact/9qFynjygAZ1dGXf3AuCrm6" target="_blank" rel="noopener">Caída del TCH Riopaila 2026: modelo y validación</a>.</p>
+    <section class="ct-card">
+      <h2>Qué se mide</h2>
+      <p class="ct-text">La caída de cada suerte es su TCH histórico menos su TCH real. El histórico es lo que esa misma suerte dio en 2020-25 (promedio geométrico de sus cosechas, en los mismos meses). Así la caída no depende del presupuesto ni de suertes distintas.</p>
+    </section>
+    <section class="ct-card">
+      <h2>Cómo se reparte entre causas</h2>
+      <ol class="ct-list">
+        <li>Un solo modelo con 7.433 cosechas de Riopaila 2011-2026: cada suerte frente a sí misma, con efectos de año y mes de cosecha y todos los factores juntos, para que nada se cuente dos veces.</li>
+        <li>Factores con dato medido: días con más de 32 °C el mes antes de cosechar, lluvia de los meses 0 a 3, déficit de agua al final del ciclo después del riego (partido en sequía y riego aplicado), cosecha mecánica por año, incendio, edad de cosecha, número de corte, variedad, roturación tardía, herbicida después de 90 días, fertilización después de 120 días y renovación no hecha.</li>
+        <li>Aporte de cada factor = su efecto × cuánto cambió frente a lo normal (2020-25; 2022-25 para el agua; 2024-25 para las labores). Respeta el signo: lo que estuvo mejor que lo normal da.</li>
+        <li>Las calificaciones que solo tiene la matriz de 2026 (roya, carbón, madurante, tiempo térmico, nivel freático, CAPEX y otras) se miden sobre lo que el modelo no explicó, frente a la suerte promedio de 2026; una peor nota solo puede restar. La nota de variedad no se usa porque sale del mismo TCH.</li>
+        <li>Lo que ninguna variable explica queda en «Sin explicar», sin forzar el cierre al 100 %.</li>
+      </ol>
+    </section>
+    <section class="ct-card">
+      <h2>Fuentes</h2>
+      <ul class="ct-list">
+        <li>Cosechas: ZQM 2011-2025 y G&amp;P 2026 (enero a septiembre).</li>
+        <li>Clima: estaciones La Paila y Bugalagrande (Precipitacion-riopaila) y Meteoportal de Cenicaña.</li>
+        <li>Riego: Consolidado de riegos 2026. Labores: control oficial de roturación y planillas de SimpleAgri.</li>
+        <li>Notas 1-3-5 y presupuesto del AgroFactors: matriz «rio matriz», hoja GYP (2). Presupuesto de la base de maduración: validación Base maduración Rio Agosto.</li>
+        <li>Programas: caida_integrada_rio.py, tablero_datos.py y validacion_modelo.py, en RIOPAILA AGRICOLA › 01 Estimados y TCH › Caida TCH 2026 - programas.</li>
+      </ul>
+    </section>
+    <section class="ct-card">
+      <h2>Límites</h2>
+      <ul class="ct-list">
+        <li>El clima viene de dos estaciones: casi no varía entre suertes de un mismo año, así que el golpe común de cada año queda en buena parte sin explicar.</li>
+        <li>Las labores solo tienen registro desde 2024 y SimpleAgri registra cada año más; «sin registro» se trata como dato faltante, no como labor.</li>
+        <li>Suerte por suerte el modelo explica poco (una suerte varía por muchas cosas que no se miden); sirve para explicar la caída del ingenio y de zonas, variedades o tipos de cosecha.</li>
+        <li>Las suertes sin historia 2020-25 con ese código (renovadas o divididas) aparecen sin caída.</li>
+      </ul>
+    </section>
+  </section>
+</div>
+
+<script>
+  // ---------------------------------------------------------------- cálculos (los ve quien abra Fuentes)
+  dash.calc('suerte_variable', {
+    inputs: ['suertes', 'pesos'],
+    title: 'Cada variable en cada suerte',
+    description: 'Una fila por suerte y variable con las t/ha que quitó (positivo) o dio (negativo); una suerte sin TCH histórico lleva una sola fila.',
+    fn: (suertes, pesos) => {
+      const out = [];
+      for (const s of suertes) {
+        const base = {
+          clave: s.clave, suerte: s.suerte, mes: Number(s.mes), zona: s.zona, zona_agroecologica: s.zona_agroecologica,
+          variedad: s.variedad, cosecha: s.cosecha, area: Number(s.area),
+          tch_hist: s.tch_hist === '' ? null : Number(s.tch_hist), tch_real: Number(s.tch_real), caida: s.caida === '' ? null : Number(s.caida),
+        };
+        if (base.caida == null || base.tch_hist == null) {
+          out.push({ ...base, variable: 'Sin TCH histórico', grupo: '', t_ha: null });
+          continue;
+        }
+        for (const w of pesos) out.push({ ...base, variable: w.variable, grupo: w.grupo, t_ha: Number(s[w.variable]) || 0 });
+      }
+      return out;
+    },
+  });
+  dash.calc('val_muestra', {
+    inputs: ['suertes'],
+    title: 'Cuánto explica el modelo con 2026',
+    description: 'Parte de la caída 2026 que queda explicada por las variables: 1 − (sin explicar ÷ caída), ponderado por área, suertes con historia.',
+    fn: (suertes) => {
+      let caida = 0, sin = 0, area = 0;
+      for (const s of suertes) {
+        if (s.caida === '' || s['Sin explicar'] === '') continue;
+        const a = Number(s.area);
+        caida += Number(s.caida) * a; sin += Number(s['Sin explicar']) * a; area += a;
+      }
+      return [{ caida_tha: caida / area, sin_explicar_tha: sin / area, explica_pct: 1 - sin / caida }];
+    },
+  });
+  dash.calc('val_fuera', {
+    inputs: ['validacion_2026'],
+    title: 'Cuánto predice el modelo sin 2026',
+    description: 'Modelo ajustado con 2011-2025: anomalía predicha (suma de los factores) frente a la real (factores + sin explicar) de lo cosechado ene-sep 2026.',
+    fn: (validacion_2026) => {
+      let pred = 0, sin = 0;
+      for (const r of validacion_2026) {
+        if (String(r.factor).startsWith('Sin explicar')) sin += Number(r.log); else pred += Number(r.log);
+      }
+      const real = pred + sin;
+      return [{ predicho_pct: Math.expm1(pred), real_pct: Math.expm1(real), explica_pct: pred / real }];
+    },
+  });
+  dash.calc('val_anios', {
+    inputs: ['validacion_anual'],
+    title: 'Años predichos sin verlos',
+    description: 'Correlación entre la anomalía real y la predicha de cada año 2013-2026, cada uno predicho por un modelo ajustado sin ese año, y en cuántos años coincide el signo.',
+    fn: (validacion_anual) => {
+      const x = validacion_anual.map((r) => Number(r.predicho)), y = validacion_anual.map((r) => Number(r.real));
+      const mx = x.reduce((a, b) => a + b, 0) / x.length, my = y.reduce((a, b) => a + b, 0) / y.length;
+      let sxy = 0, sxx = 0, syy = 0;
+      for (let i = 0; i < x.length; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; }
+      const aciertos = x.filter((v, i) => Math.sign(v) === Math.sign(y[i])).length;
+      return [{ correlacion: sxy / Math.sqrt(sxx * syy), anios: x.length, aciertos }];
+    },
+  });
+</script>
+
+<script>
+  (() => {
+    const loc = d3.formatLocale({ decimal: ',', thousands: '.', grouping: [3], currency: ['$', ''], percent: ' %' });
+    const f1 = loc.format(',.1f'), f0 = loc.format(',.0f'), fp = loc.format('.1%'), fp0 = loc.format('.0%'), f2 = loc.format(',.2f');
+    const sg = (v) => (v > 0.0499 ? '+' : '') + f1(v);
+    const sg0 = (v) => (v > 0.5 ? '+' : '') + f0(v);
+    const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre'];
+    const GRUPOS = ['No controlable', 'Agronómico y operativo', 'Flujo de caja', 'Sin explicar'];
+    // colores de marca de Riopaila por tipo de factor (los mismos de la presentación a la gerencia)
+    const color = (g) => g === 'Agronómico y operativo' ? 'var(--rp-rojo)' : g === 'Flujo de caja' ? 'var(--rp-amarillo)'
+      : g === 'No controlable' ? 'var(--rp-gris)' : 'var(--cds-chart-muted)';
+    const PRED = 'var(--rp-rojo)';
+    const enc = (v) => encodeURIComponent(v);
+    const $ = (id) => document.getElementById(id);
+    const vacio = (v) => v === '' || v == null || Number.isNaN(Number(v));
+    const FILTROS = [['mes', 'f-mes'], ['zona', 'f-zona'], ['za', 'f-za'], ['variedad', 'f-variedad'], ['cosecha', 'f-cosecha']];
+    const ocultas = () => new Set(dash.params().ocultas || []);
+    let pagina = 'caida';
+
+    // ---------------------------------------------------------------- pestañas
+    const PAGINAS = ['caida', 'puente', 'validacion', 'metodo'];
+    const mostrar = (p, link) => {
+      pagina = PAGINAS.includes(p) ? p : 'caida';
+      for (const id of PAGINAS) $(id).hidden = id !== pagina;
+      for (const b of document.querySelectorAll('.ct-tab')) b.setAttribute('aria-selected', String(b.dataset.page === pagina));
+      $('ct-filtros').hidden = pagina === 'validacion' || pagina === 'metodo';
+      $('ct-frase').hidden = pagina === 'validacion' || pagina === 'metodo';
+      if (link) dash.setLink(pagina);
+      dibujar();
+    };
+    for (const b of document.querySelectorAll('.ct-tab')) b.addEventListener('click', () => mostrar(b.dataset.page, true));
+
+    // ---------------------------------------------------------------- filtros
+    const pasa = (r, p) => (!p.mes || String(Number(r.mes)) === String(p.mes)) && (!p.zona || String(r.zona).trim() === p.zona)
+      && (!p.za || String(r.zona_agroecologica).trim() === p.za) && (!p.variedad || String(r.variedad).trim() === p.variedad)
+      && (!p.cosecha || String(r.cosecha).trim() === p.cosecha);
+    const enFiltro = () => {
+      const s = dash.data('suertes');
+      if (s.status !== 'ok') return [];
+      return s.data.filter((r) => pasa(r, dash.params()));
+    };
+    const resumidas = () => {
+      const p = dash.params(), s = dash.data('suertes');
+      if (s.status !== 'ok') return [];
+      return p.suerte ? s.data.filter((r) => r.clave === p.suerte) : s.data.filter((r) => pasa(r, p));
+    };
+    const etiqueta = () => {
+      const p = dash.params();
+      if (p.suerte) return 'Suerte ' + p.suerte;
+      const partes = [];
+      if (p.mes) partes.push('cosechado en ' + MESES[Number(p.mes) - 1]);
+      if (p.zona) partes.push('zona ' + p.zona);
+      if (p.za) partes.push('zona agroecológica ' + p.za);
+      if (p.variedad) partes.push(p.variedad);
+      if (p.cosecha) partes.push('cosecha ' + p.cosecha.toLowerCase());
+      if (!partes.length) return 'Todas las suertes';
+      const t = partes.join(' · ');
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    };
+    for (const [k, id] of FILTROS) $(id).addEventListener('change', (ev) => dash.setParams({ [k]: ev.target.value || null, suerte: null }));
+    const chip = $('ct-suerte');
+    chip.addEventListener('click', () => dash.setParams({ suerte: null }));
+    $('ct-reset').addEventListener('click', () => { $('ct-buscar').value = ''; dash.resetParams(); });
+    const opciones = (sel, valores, todas, actual) => {
+      if (sel === document.activeElement && sel.options.length > 1) { sel.value = actual ?? ''; return; }
+      sel.replaceChildren(new Option(todas, ''), ...valores.map((v) => new Option(v, v)));
+      sel.value = actual ?? '';
+    };
+    function filtros() {
+      const p = dash.params(), s = dash.data('suertes');
+      $('f-mes').value = p.mes ? String(p.mes) : '';
+      const filas = s.status === 'ok' ? s.data : [];
+      const unicos = (k) => [...new Set(filas.map((r) => String(r[k] ?? '').trim()).filter((v) => v && v.toLowerCase() !== 'nan'))];
+      const col = new Intl.Collator('es', { numeric: true });
+      opciones($('f-zona'), unicos('zona').sort(col.compare), 'Todas', p.zona);
+      opciones($('f-za'), unicos('zona_agroecologica').sort(col.compare), 'Todas', p.za);
+      opciones($('f-variedad'), unicos('variedad').sort((a, b) => (a === 'VARIAS') - (b === 'VARIAS') || col.compare(a, b)), 'Todas', p.variedad);
+      opciones($('f-cosecha'), unicos('cosecha').sort(col.compare), 'Todas', p.cosecha);
+      chip.hidden = !p.suerte;
+      chip.textContent = p.suerte ? `Suerte ${p.suerte} ×` : '';
+      chip.setAttribute('aria-label', p.suerte ? `Quitar la suerte ${p.suerte}` : 'Quitar la suerte');
+    }
+
+    // ---------------------------------------------------------------- resumen de un grupo de suertes
+    function resumen() {
+      const filas = resumidas();
+      const con = filas.filter((r) => !vacio(r.caida) && !vacio(r.tch_hist));
+      const area = d3.sum(con, (r) => Number(r.area));
+      if (!area) return { total: filas.length, n: 0, area: 0, porVar: [], filas };
+      const hist = d3.sum(con, (r) => Number(r.tch_hist) * Number(r.area)) / area;
+      const real = d3.sum(con, (r) => Number(r.tch_real) * Number(r.area)) / area;
+      const claves = new Set(con.map((r) => r.clave));
+      const sv = dash.data('suerte_variable');
+      const vars = new Map();
+      if (sv.status === 'ok') {
+        for (const r of sv.data) {
+          if (!claves.has(r.clave) || r.t_ha == null) continue;
+          const a = vars.get(r.variable) || { variable: r.variable, grupo: r.grupo, t: 0 };
+          a.t += r.t_ha * r.area;
+          vars.set(r.variable, a);
+        }
+      }
+      const porVar = [...vars.values()].map((a) => ({ variable: a.variable, grupo: a.grupo, t_ha: a.t / area, toneladas: a.t }));
+      return { total: filas.length, n: con.length, area, hist, real, caida: hist - real, pct: (hist - real) / hist, ton: (hist - real) * area, porVar, filas: con };
+    }
+
+    // ---------------------------------------------------------------- utilidades
+    const leyenda = (el, items) => el.replaceChildren(...items.map(([g, c, op]) => {
+      const s = document.createElement('span'), i = document.createElement('i');
+      i.style.background = c; if (op) i.style.opacity = op;
+      s.append(i, g);
+      return s;
+    }));
+    leyenda($('ct-leyenda'), [...GRUPOS.map((g) => [g, color(g)]), ['Otras u ocultas', 'var(--cds-chart-muted)']]);
+    leyenda($('ct-leg-anios'), [['Lo que pasó', 'var(--cds-chart-muted)'], ['Lo que predijo el modelo sin ver ese año', PRED]]);
+    leyenda($('ct-leg-seg'), [['Lo que pasó', 'var(--cds-chart-muted)'], ['Lo que predijo sin ver 2026', PRED]]);
+    const msg = (el, text, fail) => {
+      el.replaceChildren();
+      const d = document.createElement('div');
+      d.className = 'ct-msg' + (fail ? ' ct-fail' : '');
+      d.textContent = text;
+      el.append(d);
+    };
+    const tip = (box, el, ev, lines) => {
+      box.replaceChildren(...lines.map(([t, k]) => { const d = document.createElement('div'); if (k) d.className = 'ct-tip-k'; d.textContent = t; return d; }));
+      box.hidden = false;
+      const card = el.closest('.ct-card').getBoundingClientRect();
+      const bw = box.offsetWidth, bh = box.offsetHeight;
+      let x = ev.clientX - card.left + 12, y = ev.clientY - card.top + 12;
+      if (x + bw > card.width - 8) x = Math.max(8, ev.clientX - card.left - bw - 12);
+      if (y + bh > card.height - 8) y = Math.max(8, ev.clientY - card.top - bh - 12);
+      box.style.left = x + 'px';
+      box.style.top = y + 'px';
+    };
+    const corta = (node, max) => {
+      let t = node.text();
+      while (t.length > 4 && node.node().getComputedTextLength() > max) { t = t.slice(0, -2); node.text(t + '…'); }
+    };
+    const estado = (el, ids) => {
+      const st = ids.map((id) => dash.data(id).status);
+      if (st.includes('error')) { el.classList.remove('dash-skeleton'); msg(el, 'Failed to load', true); return false; }
+      if (st.some((x) => x !== 'ok')) { el.replaceChildren(); el.classList.add('dash-skeleton'); return false; }
+      el.classList.remove('dash-skeleton');
+      return true;
+    };
+    const SIN_DATOS = 'No hay suertes con TCH histórico 2020-25 en este filtro: no hay caída para repartir.';
+    const td = (text, cls) => { const d = document.createElement('td'); if (cls) d.className = cls; d.textContent = text; return d; };
+
+    // ---------------------------------------------------------------- 1. cifras, frase, cascada, grupos, tablas
+    function cifras(R) {
+      const ok = dash.data('suertes').status === 'ok';
+      const set = (id, v, f) => { const el = $(id); el.classList.toggle('dash-skeleton', !ok); el.textContent = v == null || !ok ? '—' : f(v); };
+      const hay = R.n > 0;
+      set('k-hist', hay ? R.hist : null, f1);
+      set('k-real', hay ? R.real : null, f1);
+      set('k-caida', hay ? R.caida : null, f1);
+      set('k-pct', hay ? R.pct : null, fp);
+      set('k-ton', hay ? R.ton : null, f0);
+      set('k-n', ok ? R.n : null, f0);
+      set('k-area', ok ? R.area : null, f0);
+      set('k-tot', ok ? R.total : null, f0);
+    }
+    function frase(R) {
+      const p = $('ct-frase');
+      const listo = dash.data('suertes').status === 'ok' && dash.data('suerte_variable').status === 'ok';
+      p.classList.toggle('dash-skeleton', !listo);
+      p.replaceChildren();
+      if (!listo) { p.textContent = '—'; return; }
+      const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
+      if (!R.n) { p.append(etiqueta(), ': ', R.total ? 'no tiene TCH histórico 2020-25, así que no hay caída para repartir.' : 'ninguna suerte cumple el filtro.'); return; }
+      p.append(etiqueta(), ': el TCH pasó de ', b(f1(R.hist)), ' a ', b(f1(R.real)), ' t/ha, una caída de ', b(f1(R.caida)), ` t/ha (${fp(R.pct)}).`);
+      const oc = ocultas();
+      const top = R.porVar.filter((x) => x.variable !== 'Sin explicar' && !oc.has(x.variable) && x.t_ha > 0.05).sort((a, b2) => b2.t_ha - a.t_ha).slice(0, 2);
+      if (top.length) {
+        p.append(' Lo que más quitó: ');
+        top.forEach((t, i) => p.append(i ? ' y ' : '', t.variable, ' (', b(f1(t.t_ha)), ' t/ha)'));
+        p.append('.');
+      }
+    }
+    function cascada(R) {
+      const el = $('ct-puente'), box = $('ct-tip1');
+      box.hidden = true;
+      if (!estado(el, ['suertes', 'suerte_variable', 'pesos'])) return;
+      if (!R.n) return msg(el, SIN_DATOS);
+      const info = new Map(dash.data('pesos').data.map((r) => [r.variable, r]));
+      const oc = ocultas();
+      const sin = R.porVar.find((r) => r.variable === 'Sin explicar');
+      const vars = R.porVar.filter((r) => r.variable !== 'Sin explicar' && !oc.has(r.variable));
+      const hid = R.porVar.filter((r) => r.variable !== 'Sin explicar' && oc.has(r.variable));
+      const grandes = vars.filter((r) => Math.abs(r.t_ha) >= 0.05).sort((a, b) => b.t_ha - a.t_ha);
+      const chicas = vars.filter((r) => Math.abs(r.t_ha) < 0.05);
+      const pasos = [...grandes];
+      if (chicas.length) pasos.push({ variable: `Otras ${chicas.length} variables`, grupo: 'Otras', t_ha: d3.sum(chicas, (r) => r.t_ha), toneladas: d3.sum(chicas, (r) => r.toneladas), lista: chicas.map((r) => r.variable) });
+      if (hid.length) pasos.push({ variable: `Variables ocultas (${hid.length})`, grupo: 'Ocultas', t_ha: d3.sum(hid, (r) => r.t_ha), toneladas: d3.sum(hid, (r) => r.toneladas), lista: hid.map((r) => `${r.variable} ${sg(-r.t_ha)}`) });
+      if (sin) pasos.push(sin);
+      const items = [{ tipo: 't', variable: 'TCH histórico 2020-25', v: R.hist }];
+      let run = R.hist;
+      for (const p of pasos) { items.push({ ...p, tipo: 'p', a: run, b: run - p.t_ha }); run -= p.t_ha; }
+      items.push({ tipo: 't', variable: 'TCH real 2026', v: R.real });
+      puenteSvg(el, items, (d, ev) => {
+        const w = info.get(d.variable);
+        const lines = [[d.grupo === 'Otras' ? 'Variables que movieron poco' : d.grupo === 'Ocultas' ? 'Ocultas en «Variables»' : d.grupo, true], [d.variable],
+          [`Movió el TCH ${sg(-d.t_ha)} t/ha (${sg0(-d.toneladas)} t)`]];
+        if (w && w.efecto) lines.push([`Efecto medido: ${w.efecto}`, true]);
+        if (w && String(w.solo_2026) === 'True') lines.push(['Solo hay notas de 2026: frente a la suerte promedio', true]);
+        if (d.lista) lines.push([d.lista.join(', '), true]);
+        tip(box, el, ev, lines);
+      }, () => { box.hidden = true; });
+    }
+    // dibuja un puente horizontal: totales como puntos, pasos como barras flotantes
+    function puenteSvg(el, items, onTip, offTip, opts = {}) {
+      const W = Math.max(280, el.clientWidth), RH = opts.rh || 28, TOP = 6, BOT = 30;
+      const H = TOP + items.length * RH + BOT;
+      el.replaceChildren();
+      const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`)
+        .attr('role', 'img').attr('aria-label', opts.label || 'Cascada del TCH');
+      const lab = svg.append('g').style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg)');
+      const maxLab = Math.min(W * 0.42, 280);
+      let labW = 0;
+      items.forEach((d, i) => {
+        const t = lab.append('text').attr('x', 0).attr('y', TOP + i * RH + RH / 2).attr('dy', '0.35em').text(d.variable).attr('font-weight', d.tipo === 't' ? 600 : null);
+        corta(t, maxLab);
+        labW = Math.max(labW, t.node().getComputedTextLength());
+      });
+      const x0 = labW + 14, x1 = W - 56;
+      const ext = opts.ext || d3.extent(items.flatMap((d) => (d.tipo === 't' ? [d.v] : [d.a, d.b])));
+      const pad = Math.max(0.6, (ext[1] - ext[0]) * 0.06);
+      const x = d3.scaleLinear([ext[0] - pad, ext[1] + pad], [x0, x1]);
+      const g = svg.append('g');
+      const ticks = x.ticks(Math.max(2, Math.floor((x1 - x0) / 80)));
+      const ftk = ticks.length > 1 && ticks[1] - ticks[0] < 1 ? f1 : f0;
+      g.selectAll('line.gr').data(ticks).join('line').attr('x1', x).attr('x2', x).attr('y1', TOP).attr('y2', H - BOT + 4).attr('stroke', 'var(--cds-chart-grid)');
+      g.selectAll('text.tk').data(ticks).join('text').attr('x', x).attr('y', H - 10).attr('text-anchor', 'middle')
+        .style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg-muted)').text((v) => ftk(v));
+      items.forEach((d, i) => {
+        const yc = TOP + i * RH + RH / 2;
+        if (d.tipo === 't') {
+          g.append('line').attr('x1', x(d.v)).attr('x2', x(d.v)).attr('y1', yc - 9).attr('y2', yc + 9).attr('stroke', 'var(--color-fg)').attr('stroke-width', 2).attr('stroke-linecap', 'round');
+          g.append('circle').attr('cx', x(d.v)).attr('cy', yc).attr('r', 4.5).attr('fill', 'var(--color-fg)');
+          g.append('text').attr('x', W).attr('y', yc).attr('dy', '0.35em').attr('text-anchor', 'end').attr('font-weight', 600)
+            .style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg)').text(f1(d.v));
+          return;
+        }
+        const lo = Math.min(d.a, d.b), hi = Math.max(d.a, d.b);
+        const gris = d.grupo === 'Otras' || d.grupo === 'Ocultas' || !d.grupo;
+        const r = g.append('rect').attr('x', x(lo)).attr('y', yc - 8).attr('width', Math.max(2, x(hi) - x(lo))).attr('height', 16).attr('rx', 3)
+          .attr('fill', d.fill || (gris ? 'var(--cds-chart-muted)' : color(d.grupo))).attr('fill-opacity', d.grupo === 'Ocultas' ? 0.45 : null);
+        if (i + 1 < items.length) g.append('line').attr('x1', x(d.b)).attr('x2', x(d.b)).attr('y1', yc + 8).attr('y2', yc + RH - 8).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '2 2');
+        g.append('text').attr('x', W).attr('y', yc).attr('dy', '0.35em').attr('text-anchor', 'end')
+          .style('font-size', 'var(--cds-font-size-caption)').style('font-variant-numeric', 'tabular-nums')
+          .attr('fill', d.t_ha > 0.0499 ? 'var(--color-bad)' : d.t_ha < -0.0499 ? 'var(--color-ok)' : 'var(--color-fg-muted)').text(sg(-d.t_ha));
+        if (onTip) r.on('mousemove', (ev) => onTip(d, ev)).on('mouseleave', offTip);
+      });
+    }
+    function grupos(R) {
+      const el = $('ct-grupos'), box = $('ct-tip2');
+      box.hidden = true;
+      if (!estado(el, ['suertes', 'suerte_variable'])) return;
+      if (!R.n) return msg(el, SIN_DATOS);
+      const oc = ocultas();
+      const suma = (f) => ({ t_ha: d3.sum(R.porVar.filter(f), (r) => r.t_ha), toneladas: d3.sum(R.porVar.filter(f), (r) => r.toneladas) });
+      const rows = GRUPOS.map((k) => ({ grupo: k, ...suma((r) => r.grupo === k && !oc.has(r.variable)) }));
+      if (R.porVar.some((r) => oc.has(r.variable))) rows.push({ grupo: 'Variables ocultas', ...suma((r) => oc.has(r.variable)) });
+      barrasH(el, rows.map((d) => ({ nombre: d.grupo, v: -d.t_ha, fill: d.grupo === 'Variables ocultas' ? 'var(--cds-chart-muted)' : color(d.grupo),
+        op: d.grupo === 'Variables ocultas' ? 0.45 : null, tip: [[d.grupo, true], [`${sg(-d.t_ha)} t/ha · ${sg0(-d.toneladas)} t`]] })), box, 'Cambio del TCH por grupo de variables', sg);
+    }
+    // barras horizontales con signo, una fila por elemento
+    function barrasH(el, rows, box, label, fmt) {
+      const W = Math.max(260, el.clientWidth), RH = 40, TOP = 6, BOT = 30;
+      const H = TOP + rows.length * RH + BOT;
+      el.replaceChildren();
+      const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', label);
+      let labW = 0;
+      const lab = svg.append('g').style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg)');
+      rows.forEach((d, i) => {
+        const t = lab.append('text').attr('x', 0).attr('y', TOP + i * RH + RH / 2).attr('dy', '0.35em').text(d.nombre);
+        corta(t, W * 0.4);
+        labW = Math.max(labW, t.node().getComputedTextLength());
+      });
+      const vals = rows.map((d) => d.v);
+      const lo = Math.min(0, d3.min(vals)), hi = Math.max(0, d3.max(vals));
+      const pad = Math.max(0.3, (hi - lo) * 0.08);
+      const x0 = labW + 14 + 52, x1 = W - 56;
+      const x = d3.scaleLinear([lo - pad, hi + pad], [x0, x1]);
+      const g = svg.append('g');
+      const ticks = x.ticks(Math.max(2, Math.floor((x1 - x0) / 70)));
+      g.selectAll('line').data(ticks).join('line').attr('x1', x).attr('x2', x).attr('y1', TOP).attr('y2', H - BOT + 4)
+        .attr('stroke', (v) => (v === 0 ? 'var(--cds-chart-axis)' : 'var(--cds-chart-grid)'));
+      g.selectAll('text').data(ticks).join('text').attr('x', x).attr('y', H - 10).attr('text-anchor', 'middle')
+        .style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg-muted)').text((v) => f1(v));
+      rows.forEach((d, i) => {
+        const yc = TOP + i * RH + RH / 2;
+        const r = g.append('rect').attr('x', x(Math.min(0, d.v))).attr('y', yc - 10).attr('height', 20).attr('rx', 4)
+          .attr('width', Math.max(2, Math.abs(x(d.v) - x(0)))).attr('fill', d.fill).attr('fill-opacity', d.op);
+        g.append('text').attr('x', d.v < 0 ? x(d.v) - 6 : x(d.v) + 6).attr('y', yc).attr('dy', '0.35em').attr('text-anchor', d.v < 0 ? 'end' : 'start')
+          .style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg)').text(fmt(d.v));
+        if (d.tip) r.on('mousemove', (ev) => tip(box, el, ev, d.tip)).on('mouseleave', () => { box.hidden = true; });
+      });
+    }
+
+    const orden = { k: 'caida', dir: -1 };
+    const NUM = new Set(['area', 'tch_hist', 'tch_real', 'caida', 't_ha']);
+    function tabla() {
+      const t = $('ct-tabla'), body = t.tBodies[0];
+      const sv = dash.data('suerte_variable');
+      if (sv.status !== 'ok' || dash.data('suertes').status !== 'ok') { body.replaceChildren(); return; }
+      const p = dash.params(), oc = ocultas(), q = $('ct-buscar').value.trim().toLowerCase();
+      const claves = new Set(enFiltro().map((r) => r.clave));
+      const mejor = new Map();
+      for (const r of sv.data) {
+        if (!claves.has(r.clave)) continue;
+        if (r.t_ha != null && r.variable !== 'Sin explicar' && oc.has(r.variable)) continue;
+        const m = mejor.get(r.clave);
+        if (!m || (r.t_ha != null && (m.t_ha == null || r.t_ha > m.t_ha))) mejor.set(r.clave, r);
+      }
+      let rows = [...mejor.values()];
+      if (q) rows = rows.filter((r) => [r.clave, r.variedad, r.variable, r.cosecha, r.zona_agroecologica].join(' ').toLowerCase().includes(q));
+      const key = orden.k;
+      rows.sort((a, b) => {
+        const va = a[key], vb = b[key];
+        if (NUM.has(key)) {
+          const na = vacio(va), nb = vacio(vb);
+          if (na || nb) return na === nb ? 0 : na ? 1 : -1;
+          return (Number(va) - Number(vb)) * orden.dir;
+        }
+        return String(va ?? '').localeCompare(String(vb ?? ''), 'es', { numeric: true }) * orden.dir;
+      });
+      const maxC = d3.max(rows, (r) => (vacio(r.caida) ? 0 : Number(r.caida))) || 1;
+      body.replaceChildren(...rows.map((r) => {
+        const tr = document.createElement('tr');
+        tr.dataset.key = enc(r.clave) + ',' + enc(r.variable);
+        tr.dataset.clave = r.clave;
+        if (p.suerte === r.clave) tr.className = 'on';
+        const caida = td(vacio(r.caida) ? '—' : f1(Number(r.caida)), 'n');
+        if (!vacio(r.caida) && Number(r.caida) > 0) {
+          const bar = document.createElement('span'); bar.className = 'ct-bar'; bar.style.width = (2.5 * Number(r.caida) / maxC) + 'rem'; caida.append(bar);
+        }
+        tr.append(td(r.clave, 'h-m'), td(r.zona_agroecologica ?? '', 'ct-hide-n'), td(r.variedad ?? '', 'ct-hide-n'), td(r.cosecha ?? '', 'ct-hide-n'),
+          td(vacio(r.area) ? '—' : f1(Number(r.area)), 'n ct-hide-n'), td(vacio(r.tch_hist) ? '—' : f1(Number(r.tch_hist)), 'n'),
+          td(vacio(r.tch_real) ? '—' : f1(Number(r.tch_real)), 'n'), caida, td(r.variable), td(vacio(r.t_ha) ? '—' : f1(Number(r.t_ha)), 'n'));
+        return tr;
+      }));
+      for (const th of t.tHead.rows[0].cells) {
+        if (th.dataset.field === key) th.setAttribute('aria-sort', orden.dir > 0 ? 'ascending' : 'descending');
+        else th.removeAttribute('aria-sort');
+      }
+    }
+    $('ct-tabla').tHead.addEventListener('click', (ev) => {
+      const th = ev.target.closest('th');
+      if (!th) return;
+      const k = th.dataset.field;
+      orden.dir = orden.k === k ? -orden.dir : (NUM.has(k) ? -1 : 1);
+      orden.k = k;
+      tabla();
+    });
+    $('ct-tabla').tBodies[0].addEventListener('click', (ev) => {
+      const tr = ev.target.closest('tr[data-clave]');
+      if (!tr) return;
+      dash.setParams({ suerte: dash.params().suerte === tr.dataset.clave ? null : tr.dataset.clave });
+      $('ct-cascada').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    $('ct-buscar').addEventListener('input', tabla);
+
+    function pesos() {
+      const body = $('ct-pesos').tBodies[0];
+      const pz = dash.data('pesos');
+      if (pz.status !== 'ok') { body.replaceChildren(); return; }
+      const oc = ocultas();
+      body.replaceChildren(...pz.data.map((r) => {
+        const tr = document.createElement('tr');
+        tr.dataset.key = enc(r.variable);
+        if (oc.has(r.variable)) tr.className = 'off';
+        tr.append(td(r.variable), td(r.grupo, 'ct-hide-n'), td(r.efecto ?? ''), td(vacio(r.nota5_vs_1_tha) ? '' : f1(Number(r.nota5_vs_1_tha)), 'n'));
+        return tr;
+      }));
+    }
+
+    // ---------------------------------------------------------------- filtro de variables
+    const vbox = $('ct-vars-box'), vdet = $('ct-vars');
+    let armado = false;
+    const poner = (set) => dash.setParams({ ocultas: [...set] });
+    function variables() {
+      const pz = dash.data('pesos');
+      const oc = ocultas();
+      $('ct-vars-sum').textContent = oc.size ? `Variables: ${oc.size} oculta${oc.size > 1 ? 's' : ''}` : 'Variables: todas';
+      if (pz.status !== 'ok') return;
+      const lista = pz.data.filter((r) => r.variable !== 'Sin explicar');
+      if (!armado) {
+        armado = true;
+        const q = document.createElement('div');
+        q.className = 'ct-vars-q';
+        const boton = (texto, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'ct-btn'; b.textContent = texto; b.addEventListener('click', fn); return b; };
+        q.append(boton('Ver todas', () => poner(new Set())),
+          boton('Ocultar las de solo 2026', () => poner(new Set([...ocultas(), ...lista.filter((r) => String(r.solo_2026) === 'True').map((r) => r.variable)]))));
+        vbox.append(q);
+        for (const g of GRUPOS.filter((k) => k !== 'Sin explicar')) {
+          const vs = lista.filter((r) => r.grupo === g);
+          if (!vs.length) continue;
+          const box = document.createElement('div');
+          box.className = 'ct-vars-g';
+          const lg = document.createElement('label'), cg = document.createElement('input'), sw = document.createElement('i');
+          cg.type = 'checkbox'; cg.dataset.grupo = g; sw.style.background = color(g);
+          cg.addEventListener('change', () => { const st = ocultas(); vs.forEach((r) => (cg.checked ? st.delete(r.variable) : st.add(r.variable))); poner(st); });
+          lg.append(cg, sw, g);
+          const l = document.createElement('div');
+          l.className = 'ct-vars-l';
+          for (const r of vs) {
+            const lb = document.createElement('label'), cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.dataset.variable = r.variable;
+            cb.addEventListener('change', () => { const st = ocultas(); if (cb.checked) st.delete(r.variable); else st.add(r.variable); poner(st); });
+            lb.append(cb, r.variable);
+            l.append(lb);
+          }
+          box.append(lg, l);
+          vbox.append(box);
+        }
+        const nota = document.createElement('p');
+        nota.className = 'ct-note';
+        nota.textContent = '«Sin explicar» siempre se muestra: es lo que ninguna variable explica.';
+        vbox.append(nota);
+      }
+      for (const cb of vbox.querySelectorAll('input[data-variable]')) cb.checked = !oc.has(cb.dataset.variable);
+      for (const cg of vbox.querySelectorAll('input[data-grupo]')) {
+        const vs = lista.filter((r) => r.grupo === cg.dataset.grupo).map((r) => r.variable);
+        const n = vs.filter((v) => oc.has(v)).length;
+        cg.checked = n === 0;
+        cg.indeterminate = n > 0 && n < vs.length;
+      }
+    }
+    document.addEventListener('click', (ev) => { if (vdet.open && !vdet.contains(ev.target)) vdet.open = false; });
+
+    // ---------------------------------------------------------------- 2. puente al presupuesto
+    function puentePpto(R) {
+      const calc = (campo) => {
+        const rs = R.filas.filter((r) => !vacio(r[campo]));
+        const area = d3.sum(rs, (r) => Number(r.area));
+        if (!area) return null;
+        const w = (k) => d3.sum(rs, (r) => Number(r[k]) * Number(r.area)) / area;
+        return { n: rs.length, area, ppto: w(campo), hist: w('tch_hist'), real: w('tch_real') };
+      };
+      const P = { af: calc('ppto_agrofactors'), base: calc('ppto_base') };
+      // misma escala en los dos para que se puedan comparar
+      const ext = d3.extent(Object.values(P).filter(Boolean).flatMap((p) => [p.ppto, p.hist, p.real]));
+      const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
+      for (const k of ['af', 'base']) {
+        const el = $('ct-chart-' + k), box = $('ct-tip-' + k), fr = $('ct-frase-' + k), p = P[k];
+        box.hidden = true;
+        const listo = estado(el, ['suertes']);
+        fr.classList.toggle('dash-skeleton', !listo);
+        if (!listo) { fr.textContent = '—'; continue; }
+        if (!p) { fr.textContent = 'Ninguna suerte del filtro tiene este presupuesto y TCH histórico 2020-25.'; msg(el, SIN_DATOS); continue; }
+        const brecha = p.ppto - p.real, sobre = p.ppto - p.hist, caida = p.hist - p.real;
+        fr.replaceChildren('De ', b(f1(brecha)), ' t/ha de brecha, ', b(f1(sobre)), ' son presupuesto por encima de la historia (',
+          b(brecha > 0 ? fp0(sobre / brecha) : '—'), ') y ', b(f1(caida)), ` son caída. ${f0(p.n)} cosechas, ${f0(p.area)} ha.`);
+        const items = [
+          { tipo: 't', variable: 'Presupuesto', v: p.ppto },
+          { tipo: 'p', variable: 'Por encima de la historia', grupo: 'x', fill: 'var(--rp-amarillo)', a: p.ppto, b: p.hist, t_ha: sobre,
+            tip: `Presupuesto ${f1(p.ppto)} t/ha frente a ${f1(p.hist)} que daban esas suertes en 2020-25: ${f0(sobre * p.area)} t que ninguna causa de campo explica` },
+          { tipo: 't', variable: 'TCH histórico 2020-25', v: p.hist },
+          { tipo: 'p', variable: 'Caída', grupo: 'x', fill: 'var(--rp-rojo-oscuro)', a: p.hist, b: p.real, t_ha: caida,
+            tip: `Caída frente a la historia: ${f1(caida)} t/ha (${f0(caida * p.area)} t); la reparte la página «Caída por variable»` },
+          { tipo: 't', variable: 'TCH real 2026', v: p.real },
+        ];
+        puenteSvg(el, items, (d, ev) => tip(box, el, ev, [[d.variable, true], [d.tip]]), () => { box.hidden = true; },
+          { ext, label: 'Puente del presupuesto al TCH real', rh: 36 });
+      }
+    }
+
+    // ---------------------------------------------------------------- 3. validación
+    function kpisVal() {
+      const fmt = { explica_pct: fp0, predicho_pct: fp, real_pct: fp, correlacion: f2, r2: f2, aciertos: f0, anios: f0 };
+      for (const el of document.querySelectorAll('#validacion [data-source][data-field]')) {
+        const src = el.getAttribute('data-source'), field = el.getAttribute('data-field');
+        if (el.tagName === 'TABLE' || el.closest('table')) continue;
+        const d = dash.data(src);
+        el.classList.toggle('dash-skeleton', d.status === 'loading');
+        if (d.status !== 'ok') { el.textContent = '—'; continue; }
+        let row = d.data[0];
+        const where = el.getAttribute('data-where');
+        if (where) {
+          const cond = Object.fromEntries(where.split('&').map((p) => p.split('=').map(decodeURIComponent)));
+          row = d.data.find((r) => Object.entries(cond).every(([k, v]) => String(r[k]) === v));
+        }
+        const v = row ? Number(row[field]) : NaN;
+        el.textContent = Number.isNaN(v) ? '—' : (fmt[field] || f1)(v);
+      }
+    }
+    function anios() {
+      const el = $('ct-anios'), box = $('ct-tip4');
+      box.hidden = true;
+      if (!estado(el, ['validacion_anual'])) return;
+      const rows = dash.data('validacion_anual').data.map((r) => ({ anio: String(r.anio), real: Number(r.real), pred: Number(r.predicho), n: Number(r.cosechas), ha: Number(r.ha) }));
+      const W = Math.max(300, el.clientWidth), H = 280, y0 = 12, left = 44, bottom = 30;
+      el.replaceChildren();
+      const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Anomalía real y predicha de cada año');
+      const x = d3.scaleBand(rows.map((r) => r.anio), [left, W - 8]).padding(0.25);
+      const ext = d3.extent(rows.flatMap((r) => [r.real, r.pred, 0]));
+      const y = d3.scaleLinear([ext[0] * 1.1, ext[1] * 1.1], [H - bottom, y0]).nice();
+      const g = svg.append('g');
+      g.selectAll('line.gr').data(y.ticks(5)).join('line').attr('x1', left).attr('x2', W - 8).attr('y1', y).attr('y2', y).attr('stroke', (v) => (v === 0 ? 'var(--cds-chart-axis)' : 'var(--cds-chart-grid)'));
+      g.selectAll('text.yt').data(y.ticks(5)).join('text').attr('x', left - 6).attr('y', y).attr('dy', '0.35em').attr('text-anchor', 'end')
+        .style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg-muted)').text((v) => f0(v) + ' %');
+      const bw = x.bandwidth() / 2;
+      const paso = rows.length > 10 && x.bandwidth() < 26 ? 2 : 1;
+      rows.forEach((r, i) => {
+        const xb = x(r.anio);
+        const barra = (v, dx, fill) => g.append('rect').attr('x', xb + dx).attr('width', Math.max(1, bw - 1)).attr('y', Math.min(y(v), y(0))).attr('height', Math.max(1, Math.abs(y(v) - y(0)))).attr('rx', 2).attr('fill', fill);
+        const a = barra(r.real, 0, 'var(--cds-chart-muted)'), b = barra(r.pred, bw, PRED);
+        for (const m of [a, b]) m.on('mousemove', (ev) => tip(box, el, ev, [[r.anio, true], [`Pasó ${sg(r.real)} %`], [`Predijo ${sg(r.pred)} % sin ver ese año`], [`${f0(r.n)} cosechas, ${f0(r.ha)} ha`, true]])).on('mouseleave', () => { box.hidden = true; });
+        if (i % paso === 0 || i === rows.length - 1) g.append('text').attr('x', xb + x.bandwidth() / 2).attr('y', H - 10).attr('text-anchor', 'middle')
+          .style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg-muted)').text(r.anio);
+      });
+    }
+    function segmentos() {
+      const el = $('ct-seg'), box = $('ct-tip5'), fr = $('ct-seg-frase');
+      box.hidden = true;
+      if (!estado(el, ['validacion_segmentos'])) { fr.textContent = '—'; return; }
+      const dim = $('f-dim').value;
+      const rows = dash.data('validacion_segmentos').data.filter((r) => r.dimension === dim && r.segmento !== 'sin dato' && r.segmento !== '#N/A')
+        .map((r) => ({ seg: r.segmento, real: Number(r.real), pred: Number(r.predicho), n: Number(r.cosechas), ha: Number(r.ha) }));
+      if (!rows.length) return msg(el, 'Sin datos para esta vista.');
+      if (dim !== 'Mes') rows.sort((a, b) => a.real - b.real);
+      const xs = rows.map((r) => r.pred), ys = rows.map((r) => r.real);
+      const mx = d3.mean(xs), my = d3.mean(ys);
+      const cor = rows.length > 2 ? d3.sum(rows, (r) => (r.pred - mx) * (r.real - my)) / Math.sqrt(d3.sum(xs, (v) => (v - mx) ** 2) * d3.sum(ys, (v) => (v - my) ** 2)) : NaN;
+      const peor = rows.reduce((a, b) => (b.real < a.real ? b : a));
+      const peorP = rows.reduce((a, b) => (b.pred < a.pred ? b : a));
+      if (Number.isNaN(cor)) {
+        const otra = rows.find((r) => r !== peor);
+        fr.textContent = `Cayó más ${peor.seg} (${sg(peor.real)} %) que ${otra.seg} (${sg(otra.real)} %); el modelo, sin ver 2026, ${peor.pred < otra.pred ? 'también predice más caída ahí' : 'no predice más caída ahí'} (${sg(peor.pred)} % frente a ${sg(otra.pred)} %).`;
+      } else {
+        fr.textContent = `Correlación entre lo que pasó y lo que predijo: ${f2(cor)}. Donde más cayó fue ${peor.seg} (${sg(peor.real)} %); ${peorP === peor ? 'es también donde el modelo predice más caída' : `el modelo predice más caída en ${peorP.seg}`}.`;
+      }
+      const W = Math.max(280, el.clientWidth), RH = 30, TOP = 6, BOT = 30;
+      const H = TOP + rows.length * RH + BOT;
+      el.replaceChildren();
+      const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', `Caída real y predicha por ${dim}`);
+      let labW = 0;
+      const lab = svg.append('g').style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg)');
+      rows.forEach((r, i) => {
+        const t = lab.append('text').attr('x', 0).attr('y', TOP + i * RH + RH / 2).attr('dy', '0.35em').text(r.seg);
+        corta(t, W * 0.35);
+        labW = Math.max(labW, t.node().getComputedTextLength());
+      });
+      const ext = d3.extent(rows.flatMap((r) => [r.real, r.pred, 0]));
+      const x = d3.scaleLinear([ext[0] - 1, ext[1] + 1], [labW + 14, W - 12]).nice();
+      const g = svg.append('g');
+      g.selectAll('line.gr').data(x.ticks(6)).join('line').attr('x1', x).attr('x2', x).attr('y1', TOP).attr('y2', H - BOT + 4).attr('stroke', (v) => (v === 0 ? 'var(--cds-chart-axis)' : 'var(--cds-chart-grid)'));
+      g.selectAll('text.tk').data(x.ticks(6)).join('text').attr('x', x).attr('y', H - 10).attr('text-anchor', 'middle')
+        .style('font-size', 'var(--cds-font-size-caption)').attr('fill', 'var(--color-fg-muted)').text((v) => f0(v) + ' %');
+      rows.forEach((r, i) => {
+        const yc = TOP + i * RH + RH / 2;
+        g.append('line').attr('x1', x(r.real)).attr('x2', x(r.pred)).attr('y1', yc).attr('y2', yc).attr('stroke', 'var(--cds-chart-grid)').attr('stroke-width', 2);
+        const a = g.append('circle').attr('cx', x(r.real)).attr('cy', yc).attr('r', 6).attr('fill', 'var(--cds-chart-muted)');
+        const b = g.append('circle').attr('cx', x(r.pred)).attr('cy', yc).attr('r', 6).attr('fill', PRED);
+        for (const m of [a, b]) m.on('mousemove', (ev) => tip(box, el, ev, [[r.seg, true], [`Pasó ${sg(r.real)} %`], [`Predijo ${sg(r.pred)} % sin ver 2026`], [`${f0(r.n)} cosechas, ${f0(r.ha)} ha`, true]])).on('mouseleave', () => { box.hidden = true; });
+      });
+    }
+    $('f-dim').addEventListener('change', segmentos);
+    function tablasVal() {
+      const t1 = $('ct-tabla-fuera').tBodies[0], d1 = dash.data('validacion_2026');
+      t1.replaceChildren(...(d1.status === 'ok' ? d1.data : []).slice().sort((a, b) => Number(b.t_ha) - Number(a.t_ha)).map((r) => {
+        const tr = document.createElement('tr');
+        tr.dataset.key = enc(r.factor);
+        if (String(r.factor).startsWith('Sin explicar')) tr.className = 'dest';
+        tr.append(td(r.factor), td(f1(Number(r.t_ha)), 'n'));
+        return tr;
+      }));
+      const t2 = $('ct-tabla-metodos').tBodies[0], d2 = dash.data('validacion_metodos');
+      t2.replaceChildren(...(d2.status === 'ok' ? d2.data : []).map((r) => {
+        const tr = document.createElement('tr');
+        tr.dataset.key = enc(r.metodo) + ',' + enc(r.objetivo);
+        tr.append(td(r.metodo), td(r.objetivo, 'ct-hide-n'), td(f2(Number(r.r2)), 'n'), td(r.nota, 'ct-hide-n'));
+        return tr;
+      }));
+    }
+
+    // ---------------------------------------------------------------- dibujo
+    function dibujar() {
+      filtros();
+      variables();
+      const R = resumen();
+      frase(R);
+      if (pagina === 'caida') { cifras(R); cascada(R); grupos(R); tabla(); pesos(); }
+      if (pagina === 'puente') puentePpto(R);
+      if (pagina === 'validacion') { kpisVal(); anios(); segmentos(); tablasVal(); }
+    }
+    dash.onData(dibujar);
+    const pedida = location.hash.slice(1);
+    if (PAGINAS.includes(pedida)) mostrar(pedida, false);
+  })();
+</script>
+
+</main>
+<footer class="pie">Riopaila Agrícola · uso interno · cosechas de enero a septiembre de 2026, datos al 23 de octubre de 2026.</footer>
+</body>
+</html>

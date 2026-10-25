@@ -1,0 +1,33 @@
+          suertes     ha
+grupo                   
+A              33  333.0
+B              60  666.0
+control       102  833.0
+controlB      114  822.0
+
+serie de 309 suertes en Earth Engine (8 a la vez)…
+listas: 309 · fecha del corte vista en el satélite: 56 %
+
+resumen (efecto = cambio del grupo − cambio del control; NDVI y NDMI en unidades del índice, rala en fracción del área):
+        comparacion  edad indice  n_grupo  n_control  cambio_grupo  cambio_control  efecto      t  peor_grupo_pct  peor_control_pct
+ A frente a control    60   ndvi       33        101        -0.018           0.017  -0.035 -1.792          42.424            41.584
+ A frente a control    60   ndmi       33        101        -0.015           0.042  -0.056 -2.867          39.394            21.782
+ A frente a control    60   rala       33        101         0.033          -0.012   0.045  0.878          36.364            33.663
+ A frente a control   100   ndvi       33        102        -0.005           0.015  -0.019 -1.058          39.394            30.392
+ A frente a control   100   ndmi       33        102        -0.014           0.008  -0.022 -1.183          45.455            34.314
+ A frente a control   100   rala       33        102         0.013          -0.047   0.060  1.048          48.485            39.216
+ A frente a control   150   ndvi       32        102         0.002          -0.002   0.004  0.302          31.250            31.373
+ A frente a control   150   ndmi       32        102        -0.046          -0.025  -0.021 -1.458          59.375            48.039
+ A frente a control   150   rala       32        102        -0.062          -0.002  -0.060 -2.010          12.500            22.549
+B frente a controlB    60   ndvi       35        104        -0.133          -0.048  -0.086 -3.427          77.143            47.115
+B frente a controlB    60   ndmi       35        104        -0.082          -0.034  -0.048 -2.345          68.571            50.962
+B frente a controlB    60   rala       35        104         0.117           0.043   0.075  1.836          57.143            40.385
+B frente a controlB   100   ndvi       20         74        -0.092          -0.061  -0.031 -0.927          70.000            50.000
+B frente a controlB   100   ndmi       20         74        -0.087          -0.042  -0.045 -1.679          70.000            50.000
+B frente a controlB   100   rala       20         74         0.266           0.116   0.149  1.901          75.000            48.649
+B frente a controlB   150   ndvi       12         39        -0.112          -0.066  -0.046 -0.935          75.000            41.026
+B frente a controlB   150   ndmi       12         39        -0.115          -0.051  -0.064 -1.305          83.333            38.462
+B frente a controlB   150   rala       12         39         0.205           0.157   0.047  0.562          75.000            61.538
+
+imágenes de los grupos A y B…
+imágenes: 58 de 93

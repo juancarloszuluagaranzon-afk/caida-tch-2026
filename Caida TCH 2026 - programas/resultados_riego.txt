@@ -1,0 +1,62 @@
+registros: 47,728 · filas idénticas repetidas: 412 · sin fecha válida: 0
+  área regada mayor que el área neta: 229 · lámina > 300 mm: 256 · lámina 0 o vacía: 36
+riegos por año (ha regadas): {2020: 117.0, 2021: 13369.0, 2022: 13377.0, 2023: 25354.0, 2024: 20966.0, 2025: 17569.0, 2026: 19373.0}
+lámina mediana por riego (mm): {2020: 118.0, 2021: 100.0, 2022: 100.0, 2023: 125.0, 2024: 143.0, 2025: 142.0, 2026: 132.0}
+LABOR: {'714': 23075, '711': 11074, '710': 10054, '715': 1449, '790': 753, '713': 578, '716': 332, '712': 1}
+
+cosechas 2022-2026 (ciclo desde 2021): 2,548 · sin ningún riego registrado en la suerte: 229 (10 % del área)
+
+Por año de cosecha (ponderado por área; riegos = veces que se regó la suerte completa):
+      rg_tot  rg_e0_4  rg_e4_8  rg_fin  mm_tot  llu_fin  et_fin  defsr_fin  def_fin   d32  cortes  % sin riego al final
+anio                                                                                                                   
+2022     2.0      0.4      1.0     0.6   223.4    545.7   637.2       91.4     29.5   4.4   507.0                  57.8
+2023     3.5      0.6      1.7     1.2   398.1    377.9   603.7      225.8     81.4  15.8   568.0                  28.0
+2024     3.6      1.1      1.8     0.7   473.8    432.1   625.6      193.5    101.8  16.4   579.0                  46.1
+2025     3.5      1.0      1.5     1.0   483.3    538.9   653.6      114.7    -20.6  10.1   577.0                  33.4
+2026     3.4      0.7      1.6     1.0   448.4    445.0   731.6      286.5    149.4  19.8   317.0                  23.1
+
+Mismos meses (ene-sep), 2026 frente a 2022-25:
+  rg_tot     2026      3.4 · 2022-25      3.2
+  rg_e0_4    2026      0.7 · 2022-25      0.8
+  rg_e4_8    2026      1.6 · 2022-25      1.7
+  rg_fin     2026      1.0 · 2022-25      0.7
+  mm_tot     2026    448.4 · 2022-25    400.9
+  llu_fin    2026    445.0 · 2022-25    502.9
+  et_fin     2026    731.6 · 2022-25    627.0
+  defsr_fin  2026    286.5 · 2022-25    124.1
+  def_fin    2026    149.4 · 2022-25     32.4
+  d32        2026     19.8 · 2022-25     14.0
+
+2026 por mes de cosecha: riegos al final / déficit sin riego al final (mm) / déficit después del riego:
+{1: (np.float64(0.8), 60, -42), 2: (np.float64(0.4), 42, 0), 3: (np.float64(0.9), 126, -3), 4: (np.float64(0.4), 158, 106), 5: (np.float64(1.2), 234, 60), 6: (np.float64(1.0), 215, 84), 7: (np.float64(1.3), 310, 137), 8: (np.float64(1.1), 367, 225), 9: (np.float64(1.2), 418, 272)}
+referencia 2022-25 por mes: {1: (np.float64(0.5), 101, 35), 2: (np.float64(0.5), 161, 92), 3: (np.float64(0.7), 208, 120), 4: (np.float64(1.3), 128, -18), 5: (np.float64(1.0), 78, -53), 6: (np.float64(0.8), 2, -106), 7: (np.float64(0.7), 4, -82), 8: (np.float64(0.6), 105, 23), 9: (np.float64(0.9), 255, 149), 10: (np.float64(0.9), 243, 124), 11: (np.float64(1.3), 230, 67), 12: (np.float64(1.1), 198, 61)}
+
+Modelo (cosechas 2022-sep 2026 con ciclo desde 2021, n=2548):
+  A. número de riegos por etapa:
+     rg_e0_4       -0.34 %  (p=0.370)
+     rg_e4_8       +0.63 %  (p=0.111)
+     rg_fin        +0.46 %  (p=0.283)
+     llu100_e4_8   +2.45 %  (p=0.000)
+     llu100_fin    +2.18 %  (p=0.000)
+     et100_e4_8    +7.73 %  (p=0.000)
+     et100_fin     -0.78 %  (p=0.263)
+  B. lámina de riego por etapa (por 100 mm):
+     mm100_e0_4    -0.15 %  (p=0.656)
+     mm100_e4_8    +0.42 %  (p=0.163)
+     mm100_fin     +0.42 %  (p=0.173)
+     llu100_e4_8   +2.44 %  (p=0.000)
+     llu100_fin    +2.18 %  (p=0.000)
+     et100_e4_8    +7.87 %  (p=0.000)
+     et100_fin     -0.79 %  (p=0.250)
+  C. déficit que quedó después del riego (por 100 mm):
+     def100_e0_4   +0.70 %  (p=0.012)
+     def100_e4_8   -0.45 %  (p=0.082)
+     def100_fin    -1.25 %  (p=0.000)
+
+  aporte a ene-sep 2026 frente a 2022-25 según A.: +0.1 % (rg_e0_4 +0.0, rg_e4_8 -0.1, rg_fin +0.1)
+
+  aporte a ene-sep 2026 frente a 2022-25 según B.: +0.2 % (mm100_e0_4 -0.0, mm100_e4_8 -0.0, mm100_fin +0.2)
+
+  aporte a ene-sep 2026 frente a 2022-25 según C.: -1.5 % (def100_e0_4 -0.3, def100_e4_8 +0.3, def100_fin -1.5)
+
+  riegos del mes 8 a la cosecha frente a ninguno: {'≤1': '+0.9 % (p=0.39)', '1-2': '+2.4 % (p=0.03)', '2-3': '+2.2 % (p=0.13)', '>3': '+3.3 % (p=0.23)'} | % del área ene-sep 2026 / 2022-25: {'2026': {'0': 23.0, '≤1': 35.0, '1-2': 29.0, '2-3': 12.0, '>3': 2.0}, '2022-25': {'0': 47.0, '≤1': 27.0, '1-2': 17.0, '2-3': 6.0, '>3': 2.0}}

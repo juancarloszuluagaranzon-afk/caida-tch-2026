@@ -1,0 +1,176 @@
+[
+ {
+  "ejemplo": "riopaila_3501",
+  "ciclo": "manual",
+  "corte": "2024-07-15",
+  "edad": 2,
+  "fecha": "2024-09-14",
+  "dias": 61,
+  "ndvi": 0.499,
+  "ndmi": 0.026,
+  "ndvi_suertes": [
+   0.529,
+   0.485,
+   0.5,
+   0.484
+  ]
+ },
+ {
+  "ejemplo": "riopaila_3501",
+  "ciclo": "manual",
+  "corte": "2024-07-15",
+  "edad": 3,
+  "fecha": "2024-10-17",
+  "dias": 94,
+  "ndvi": 0.723,
+  "ndmi": 0.249,
+  "ndvi_suertes": [
+   0.737,
+   0.71,
+   0.734,
+   0.712
+  ]
+ },
+ {
+  "ejemplo": "riopaila_3501",
+  "ciclo": "manual",
+  "corte": "2024-07-15",
+  "edad": 4,
+  "fecha": "2024-11-06",
+  "dias": 114,
+  "ndvi": 0.817,
+  "ndmi": 0.368,
+  "ndvi_suertes": [
+   0.81,
+   0.813,
+   0.829,
+   0.817
+  ]
+ },
+ {
+  "ejemplo": "riopaila_3501",
+  "ciclo": "mecanica",
+  "corte": "2025-07-15",
+  "edad": 2,
+  "fecha": "2025-09-14",
+  "dias": 61,
+  "ndvi": 0.587,
+  "ndmi": 0.142,
+  "ndvi_suertes": [
+   0.607,
+   0.507,
+   0.673,
+   0.562
+  ]
+ },
+ {
+  "ejemplo": "riopaila_3501",
+  "ciclo": "mecanica",
+  "corte": "2025-07-15",
+  "edad": 3,
+  "fecha": "2025-10-14",
+  "dias": 91,
+  "ndvi": 0.525,
+  "ndmi": 0.188,
+  "ndvi_suertes": [
+   0.473,
+   0.507,
+   0.545,
+   0.575
+  ]
+ },
+ {
+  "ejemplo": "riopaila_3501",
+  "ciclo": "mecanica",
+  "corte": "2025-07-15",
+  "edad": 4,
+  "fecha": "2025-11-18",
+  "dias": 126,
+  "ndvi": 0.708,
+  "ndmi": 0.21,
+  "ndvi_suertes": [
+   0.72,
+   0.658,
+   0.756,
+   0.698
+  ]
+ },
+ {
+  "ejemplo": "peralonso_3111-120",
+  "ciclo": "manual",
+  "corte": "2024-07-15",
+  "edad": 2,
+  "fecha": "2024-09-14",
+  "dias": 61,
+  "ndvi": 0.47,
+  "ndmi": 0.013,
+  "ndvi_suertes": [
+   0.47
+  ]
+ },
+ {
+  "ejemplo": "peralonso_3111-120",
+  "ciclo": "manual",
+  "corte": "2024-07-15",
+  "edad": 3,
+  "fecha": "2024-10-14",
+  "dias": 91,
+  "ndvi": 0.627,
+  "ndmi": 0.088,
+  "ndvi_suertes": [
+   0.627
+  ]
+ },
+ {
+  "ejemplo": "peralonso_3111-120",
+  "ciclo": "manual",
+  "corte": "2024-07-15",
+  "edad": 4,
+  "fecha": "2024-11-18",
+  "dias": 126,
+  "ndvi": 0.82,
+  "ndmi": 0.238,
+  "ndvi_suertes": [
+   0.82
+  ]
+ },
+ {
+  "ejemplo": "peralonso_3111-120",
+  "ciclo": "mecanica",
+  "corte": "2025-07-15",
+  "edad": 2,
+  "fecha": "2025-09-21",
+  "dias": 68,
+  "ndvi": 0.464,
+  "ndmi": 0.001,
+  "ndvi_suertes": [
+   0.464
+  ]
+ },
+ {
+  "ejemplo": "peralonso_3111-120",
+  "ciclo": "mecanica",
+  "corte": "2025-07-15",
+  "edad": 3,
+  "fecha": "2025-10-14",
+  "dias": 91,
+  "ndvi": 0.646,
+  "ndmi": 0.142,
+  "ndvi_suertes": [
+   0.646
+  ]
+ },
+ {
+  "ejemplo": "peralonso_3111-120",
+  "ciclo": "mecanica",
+  "corte": "2025-07-15",
+  "edad": 4,
+  "fecha": "2025-11-18",
+  "dias": 126,
+  "ndvi": 0.804,
+  "ndmi": 0.147,
+  "ndvi_suertes": [
+   0.804
+  ]
+ }
+]

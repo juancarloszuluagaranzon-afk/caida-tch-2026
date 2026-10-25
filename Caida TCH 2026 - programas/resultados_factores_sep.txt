@@ -1,0 +1,81 @@
+leyendo ZQM y G&P…
+cortes del ZQM por planta y año (2024-26): {('castilla', 2024): 670, ('castilla', 2025): 712, ('castilla', 2026): 413, ('riopaila', 2024): 579, ('riopaila', 2025): 577, ('riopaila', 2026): 317}
+
+Riopaila 2026 por mes (cortes, % mecánica): {1: (4, 84), 2: (14, 48), 3: (47, 51), 4: (17, 55), 5: (11, 0), 6: (38, 10), 7: (55, 49), 8: (69, 64), 9: (62, 75)}
+
+==================== RIOPAILA (n=7433, R²=0.61)
+  llu03_100   -1.20%  (p=0.000)
+  d32         -0.26%  (p=0.000)
+  inc         -3.81%  (p=0.004)
+  Corte       -0.31%  (p=0.379)
+  mec_2024    +1.95%  (p=0.271)
+  mec_2025    -4.32%  (p=0.001)
+  mec_2026    -7.49%  (p=0.000)
+         cortes      ha    TCH  resultado  cosecha mecánica  calor (días >32 °C)  arranque (lluvia 0-3 m)  Diatraea  variedad  edad  incendio  soca  sin explicar
+periodo                                                                                                                                                          
+ene-ago     255  2185.4  109.5       -7.0              -3.2                 -1.7                     -0.2       0.0      -0.7   1.6       0.0   0.1          -2.8
+ene-sep     317  2786.4  110.2       -6.1              -3.7                 -1.9                     -0.3       0.0      -0.7   1.5       0.0   0.1          -1.1
+ene-feb      18   145.4  121.7        4.3              -4.2                  2.0                     -0.0       0.0      -0.7   2.3       0.0  -0.3           5.3
+mar-abr      64   549.7  107.3       -4.5              -3.7                 -1.0                     -0.3       0.0      -0.3   2.5       0.0   0.2          -2.0
+may-jun      49   340.9  111.7       -9.2              -0.1                 -1.1                     -0.7       0.0      -1.1   1.1       0.0   0.0          -7.3
+jul-ago     124  1149.4  108.4       -8.3              -3.7                 -2.8                      0.1       0.0      -0.8   1.2       0.0   0.1          -2.4
+sep          62   601.0  112.5       -3.3              -5.4                 -2.6                     -0.8       0.0      -0.8   1.4       0.1   0.3           4.6
+         t_resultado  t_arranque (lluvia 0-3 m)  t_calor (días >32 °C)  t_edad  t_incendio  t_soca  t_cosecha mecánica  t_variedad  t_Diatraea  t_sin explicar
+periodo                                                                                                                                                       
+ene-ago      16700.0                      500.0                 4100.0 -3800.0      -100.0  -200.0              7700.0      1700.0        -0.0          6800.0
+ene-sep      18900.0                     1000.0                 5900.0 -4700.0      -100.0  -400.0             11300.0      2200.0        -0.0          3500.0
+ene-feb       -800.0                        0.0                 -400.0  -400.0        -0.0     0.0               800.0       100.0        -0.0          -900.0
+mar-abr       2600.0                      200.0                  600.0 -1500.0        -0.0  -100.0              2200.0       200.0        -0.0          1200.0
+may-jun       3500.0                      300.0                  400.0  -400.0        -0.0    -0.0                 0.0       400.0        -0.0          2800.0
+jul-ago      10300.0                     -100.0                 3500.0 -1500.0        -0.0  -100.0              4600.0      1000.0        -0.0          3000.0
+sep           2200.0                      600.0                 1800.0  -900.0        -0.0  -200.0              3600.0       600.0        -0.0         -3100.0
+         lluvia 0-3 m 2026  lluvia 0-3 m ref  días >32 2026  días >32 ref  % mecánica 2026  % mecánica ref  % incendio 2026  % incendio ref
+periodo                                                                                                                                    
+ene-ago              364.3             347.9           18.3          11.8             48.0            20.1              0.0             0.9
+ene-sep              376.2             348.2           19.8          12.5             53.9            19.9              0.1             1.0
+ene-feb              361.5             358.7            4.3          12.0             56.3            10.1              0.0             0.8
+mar-abr              464.0             437.6           14.4          10.6             52.5            14.4              0.0             0.6
+may-jun              362.1             302.1           13.1           8.9              7.2            18.9              0.0             1.0
+jul-ago              317.7             323.8           23.5          12.9             56.9            27.5              0.0             1.0
+sep                  419.2             349.6           25.2          15.3             75.4            19.4              0.3             1.8
+  brecha mecánica por año: {2020: np.float64(-1.9), 2021: np.float64(-2.6), 2022: np.float64(-5.3), 2023: np.float64(-1.1), 2024: np.float64(2.0), 2025: np.float64(-4.3), 2026: np.float64(-7.5)}
+
+Castilla: 79 cortes de septiembre (G&P, tierras propias); 0 venían de agosto y se reemplazan
+  control ene-ago: 331 de 351 cortes del histórico cruzan con el G&P; TCH igual (±1) en 100 %
+  lluvia: pluviómetros hasta 2026-09-27; 31 % de los cortes con pluviómetro propio
+  tierras propias 2026 por mes (cortes, % mecánica, % incendio, % con Diatraea): {1: (7, 99, 14, 21), 2: (58, 76, 6, 30), 3: (41, 63, 41, 39), 4: (24, 51, 19, 59), 5: (12, 23, 36, 51), 6: (29, 84, 19, 0), 7: (106, 93, 27, 19), 8: (69, 90, 50, 42), 9: (79, 96, 34, 35)}
+  Diatraea: -0.88 % de TCH por punto de %I.I.
+
+==================== CASTILLA tierras propias (estimado con todas las tenencias) (n=14007, R²=0.82)
+  llu03_100   -0.92%  (p=0.000)
+  d32         -0.49%  (p=0.000)
+  inc         +0.57%  (p=0.407)
+  Corte       -1.45%  (p=0.000)
+  mec         +2.27%  (p=0.000)
+         cortes      ha    TCH  resultado  cosecha mecánica  calor (días >32 °C)  arranque (lluvia 0-3 m)  Diatraea  variedad  edad  incendio  soca  sin explicar
+periodo                                                                                                                                                          
+ene-ago     346  2680.1  105.2       -5.9               0.3                 -3.2                     -1.0      -2.0       2.8   0.3       0.0  -0.0          -3.2
+ene-sep     425  3355.8  104.6       -7.0               0.3                 -4.0                     -1.1      -2.5       2.7   0.4       0.0  -0.2          -2.6
+ene-feb      65   557.6  112.7       -5.1               0.3                  1.8                     -2.6      -4.1       3.0   0.6      -0.1  -0.2          -3.9
+mar-abr      65   501.3   92.6       -4.2              -0.1                 -2.9                     -1.3      -1.7       3.0  -0.4       0.1  -0.3          -0.5
+may-jun      41   317.2  112.8       -1.8               0.0                 -2.0                      0.1       NaN       3.3   0.1      -0.0   0.8          -4.0
+jul-ago     175  1304.1  105.1       -8.2               0.5                 -5.8                     -0.5      -1.5       2.6   0.6       0.0  -0.0          -4.2
+sep          79   675.7  102.0      -11.3               0.4                 -7.0                     -1.4      -4.2       2.0   0.6       0.1  -1.0          -0.8
+         t_resultado  t_arranque (lluvia 0-3 m)  t_calor (días >32 °C)  t_edad  t_incendio  t_soca  t_cosecha mecánica  t_variedad  t_Diatraea  t_sin explicar
+periodo                                                                                                                                                       
+ene-ago      16700.0                     2700.0                 9000.0  -900.0        -0.0     0.0              -800.0     -8000.0      5700.0          8900.0
+ene-sep      24500.0                     3800.0                14000.0 -1400.0      -100.0   700.0             -1100.0     -9300.0      8800.0          9000.0
+ene-feb       3200.0                     1700.0                -1200.0  -400.0         0.0   100.0              -200.0     -1900.0      2600.0          2400.0
+mar-abr       2000.0                      600.0                 1400.0   200.0        -0.0   200.0               100.0     -1400.0       800.0           200.0
+may-jun        600.0                       -0.0                  700.0    -0.0         0.0  -300.0                -0.0     -1200.0         NaN          1400.0
+jul-ago      11300.0                      700.0                 7900.0  -800.0        -0.0     0.0              -700.0     -3600.0      2100.0          5800.0
+sep           7800.0                     1000.0                 4800.0  -400.0        -0.0   700.0              -300.0     -1400.0      2900.0           500.0
+         lluvia 0-3 m 2026  lluvia 0-3 m ref  días >32 2026  días >32 ref  % mecánica 2026  % mecánica ref  % incendio 2026  % incendio ref
+periodo                                                                                                                                    
+ene-ago              527.0             422.5           12.6           6.1             80.1            67.6             28.1            26.0
+ene-sep              550.7             434.4           14.8           6.7             83.2            69.4             29.2            25.6
+ene-feb              847.6             563.4            3.4           7.1             77.9            66.3              7.0            19.4
+mar-abr              706.1             566.4           12.7           6.7             59.0            64.7             34.2            25.0
+may-jun              250.4             256.8            8.7           4.6             69.1            68.0             23.3            26.1
+jul-ago              388.4             333.3           17.5           5.8             91.8            69.6             35.9            30.9
+sep                  644.5             488.6           23.5           9.3             95.5            77.3             33.7            24.0

@@ -1,0 +1,26 @@
+Plan de renovación 2025: 124 suertes · 1,138.5 ha
+  renovadas del plan: 31 · 302.5 ha · NO renovadas: 93 · 836.1 ha
+  lista de renovadas: 60 suertes · 543.9 ha (fuera del plan: 29 · 239.9 ha)
+  en proceso (cortadas, sin sembrar): 15 suertes · 153.0 ha · días de lucro promedio 155
+  NO renovadas por zona y tipo de finca: {(1, 'A'): {'size': 48, 'sum': 402.0}, (2, 'A'): {'size': 16, 'sum': 172.1}, (2, 'B'): {'size': 29, 'sum': 262.0}}
+  de las NO renovadas, 8 (92.0 ha) están en «área en proceso»: se renovaron tarde (sembradas en 2026): ['3106-361', '3113-070', '3122-050', '3122-150', '3418-030', '3440-723', '3501-431', '3501-520']
+
+NO renovadas en el maestro hoy: 71 de 85; corte de la caña en pie: ≤5: 15, 6-7: 11, 8-10: 24, 11+: 21 · mediana 9
+  variedades: {'CC 01-1940': 43, 'VARIAS': 8, 'RENOVACION': 4, 'CC 11-595': 3, 'CC 05-430': 3, 'CC 14-3296': 2}
+  en RENOVACION en el maestro hoy: 4
+
+curva frente a la plantilla (mismo lote): {1: '+0.0%', 2: '-5.3%', 3: '-7.8%', 4: '-10.7%', 5: '-15.1%', 6: '-16.7%', 7: '-18.6%', 8: '-20.0%', 9: '-20.4%', 10: '-21.8%', 11: '-21.4%', 12: '-19.6%', 13: '-22.4%'}
+
+Cosechas de 2026 (ene-oct): las del plan NO renovadas frente al resto de Riopaila
+  NO renovadas    32 cortes ·     284 ha · corte medio  9.4 · TCH  102.3
+  resto          330 cortes ·   2,932 ha · corte medio  4.0 · TCH  111.3
+  NO renovadas: si estuvieran renovadas daría TCH 113.6 (ciclo 1-5) → faltan 11.3 t/ha · 3,203 t; como plantilla 128.0 → 7,282 t
+  por corte: {'≤5': (4, 15, np.float64(98.7), -37), '6-7': (8, 70, np.float64(98.0), 573), '8-10': (10, 96, np.float64(95.7), 1120), '11+': (10, 103, np.float64(112.1), 1547)}
+
+Caída 2026 (ene-sep) de cada suerte frente a su propio promedio 2020-25: NO renovadas -12.0 % · resto -5.5 %
+  peso de las NO renovadas: 7 % del área cosechada ene-sep; si hubieran caído como el resto, la planta habría caído -0.4 puntos menos (≈ 1,302 t)
+
+NO renovadas con próximo corte en 2026 (motor): 38 suertes · 352 ha · TCH 97.8 · renovada 105.2 → 2,585 t
+
+NO renovadas que siguen como soca en el maestro: 66 suertes · 606 ha · corte mediano 9; las que no están en el maestro: 14
+Total NO renovadas en el maestro: 641 ha; a la pérdida media por hectárea de este año, cada cosecha sin renovar cuesta ≈ 7,231 t

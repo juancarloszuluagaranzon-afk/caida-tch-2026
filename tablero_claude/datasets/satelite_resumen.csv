@@ -1,0 +1,19 @@
+clave,comparacion,edad_dias,indice,suertes_grupo,suertes_control,cambio_grupo,cambio_control,diferencia,t,empeoraron_grupo_pct,empeoraron_control_pct
+cosecha2026-60-ndvi,Corte anterior: primer mecanizado,60,Vigor (NDVI),31,94,-0.016,0.018,-0.035,-1.7,41.9,42.6
+cosecha2026-60-ndmi,Corte anterior: primer mecanizado,60,Humedad del follaje (NDMI),31,94,-0.012,0.043,-0.055,-2.68,38.7,21.3
+cosecha2026-60-ralo,Corte anterior: primer mecanizado,60,Rebrote ralo (puntos de % del área),31,94,2.304,-1.226,3.531,0.66,35.5,33.0
+cosecha2026-100-ndvi,Corte anterior: primer mecanizado,100,Vigor (NDVI),31,95,-0.002,0.015,-0.017,-0.87,38.7,31.6
+cosecha2026-100-ndmi,Corte anterior: primer mecanizado,100,Humedad del follaje (NDMI),31,95,-0.011,0.009,-0.02,-1.04,45.2,34.7
+cosecha2026-100-ralo,Corte anterior: primer mecanizado,100,Rebrote ralo (puntos de % del área),31,95,0.718,-4.671,5.389,0.89,48.4,38.9
+cosecha2026-150-ndvi,Corte anterior: primer mecanizado,150,Vigor (NDVI),30,95,0.007,0.002,0.005,0.37,26.7,29.5
+cosecha2026-150-ndmi,Corte anterior: primer mecanizado,150,Humedad del follaje (NDMI),30,95,-0.044,-0.022,-0.021,-1.41,56.7,46.3
+cosecha2026-150-ralo,Corte anterior: primer mecanizado,150,Rebrote ralo (puntos de % del área),30,95,-7.369,-1.108,-6.26,-2.12,10.0,21.1
+alerta2027-60-ndvi,Alerta 2027: primer mecanizado en 2026,60,Vigor (NDVI),24,75,-0.102,-0.023,-0.079,-2.73,66.7,42.7
+alerta2027-60-ndmi,Alerta 2027: primer mecanizado en 2026,60,Humedad del follaje (NDMI),24,75,-0.054,-0.003,-0.051,-2.18,58.3,37.3
+alerta2027-60-ralo,Alerta 2027: primer mecanizado en 2026,60,Rebrote ralo (puntos de % del área),24,75,10.555,2.556,7.998,1.48,50.0,37.3
+alerta2027-100-ndvi,Alerta 2027: primer mecanizado en 2026,100,Vigor (NDVI),13,51,-0.033,-0.015,-0.018,-0.7,53.8,41.2
+alerta2027-100-ndmi,Alerta 2027: primer mecanizado en 2026,100,Humedad del follaje (NDMI),13,51,-0.038,-0.001,-0.036,-1.48,53.8,35.3
+alerta2027-100-ralo,Alerta 2027: primer mecanizado en 2026,100,Rebrote ralo (puntos de % del área),13,51,14.35,1.857,12.493,1.72,61.5,37.3
+alerta2027-150-ndvi,Alerta 2027: primer mecanizado en 2026,150,Vigor (NDVI),11,21,-0.072,-0.034,-0.038,-1.61,72.7,38.1
+alerta2027-150-ndmi,Alerta 2027: primer mecanizado en 2026,150,Humedad del follaje (NDMI),11,21,-0.073,-0.018,-0.056,-2.33,81.8,38.1
+alerta2027-150-ralo,Alerta 2027: primer mecanizado en 2026,150,Rebrote ralo (puntos de % del área),11,21,15.283,13.169,2.114,0.32,72.7,71.4

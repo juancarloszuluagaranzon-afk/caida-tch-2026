@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Caída del TCH Riopaila 2026</title>
+<link rel="icon" href="img/logo-riopaila.png">
+<style>
+:root {
+  --rp-rojo-oscuro: #991B1B; --rp-rojo: #DC2626; --rp-amarillo: #FEB811; --rp-gris: #707072; --rp-negro: #1C1917;
+  --bg: #F5F5F4; --surface: #FFFFFF; --surface-2: #FAFAF9; --ink: #1A1A1A; --ink-2: #44403C; --muted: #707072;
+  --line: #E7E5E4; --line-2: #D6D3D1;
+  --quita: #DC2626; --quita-suave: #FEE2E2; --suma: #2F7D5B; --suma-suave: #DCF0E5;
+  --hist: #A8A29E; --real: #1C1917; --ppto: #C98A00; --ppto-fill: #FEB811;
+  --mec: #991B1B; --man: #A8A29E; --foco: #FEB811;
+  --sombra: 0 1px 2px rgba(28,25,23,.06), 0 4px 14px rgba(28,25,23,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141210; --surface: #1F1C19; --surface-2: #26221F; --ink: #F5F5F4; --ink-2: #D6D3D1; --muted: #A8A29E;
+    --line: #34302C; --line-2: #4A4540; --quita: #F05252; --quita-suave: #3B1717; --suma: #4FB286; --suma-suave: #15291F;
+    --hist: #78716C; --real: #F5F5F4; --ppto: #FEB811; --mec: #F05252; --man: #78716C;
+    --sombra: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141210; --surface: #1F1C19; --surface-2: #26221F; --ink: #F5F5F4; --ink-2: #D6D3D1; --muted: #A8A29E;
+  --line: #34302C; --line-2: #4A4540; --quita: #F05252; --quita-suave: #3B1717; --suma: #4FB286; --suma-suave: #15291F;
+  --hist: #78716C; --real: #F5F5F4; --ppto: #FEB811; --mec: #F05252; --man: #78716C;
+  --sombra: 0 1px 2px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: Tahoma, Verdana, Geneva, sans-serif;
+  font-size: 15px; line-height: 1.5; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+.num, td.n, .tab { font-variant-numeric: tabular-nums; }
+header.marca { background: linear-gradient(90deg, var(--rp-rojo-oscuro), var(--rp-rojo)); color: #fff; }
+header.marca .in { max-width: 1240px; margin: 0 auto; padding: 18px 16px 16px; display: flex; gap: 16px; align-items: center; }
+header.marca img { width: 54px; height: 51px; flex: none; }
+header.marca h1 { margin: 0; font-size: 24px; line-height: 1.2; text-wrap: balance; }
+header.marca p { margin: 2px 0 0; font-size: 14px; color: #FEE2E2; }
+.linea { height: 5px; background: var(--rp-amarillo); }
+nav.tabs { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+nav.tabs .in { max-width: 1240px; margin: 0 auto; padding: 0 8px; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+nav.tabs .in::-webkit-scrollbar { display: none; }
+nav.tabs a { text-decoration: none; padding: 12px 14px; font-weight: 700; font-size: 14px; color: var(--muted);
+  border-bottom: 3px solid transparent; white-space: nowrap; }
+nav.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--rp-rojo); }
+nav.tabs a:focus-visible, button:focus-visible, .fila:focus-visible, tr[tabindex]:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+main { max-width: 1240px; margin: 0 auto; padding: 20px 16px 64px; }
+h2 { font-size: 22px; margin: 0 0 4px; text-wrap: balance; }
+h3 { font-size: 16px; margin: 0 0 8px; }
+.sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+.caja { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; }
+.pila { display: flex; flex-direction: column; gap: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.kpi .et { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.kpi .v { font-size: 26px; font-weight: 700; line-height: 1.2; }
+.kpi .v small { font-size: 14px; font-weight: 400; color: var(--muted); }
+.kpi.real .v { color: var(--real); } .kpi.caida .v { color: var(--quita); } .kpi.ppto .v { color: var(--ppto); }
+.nota { border-left: 4px solid var(--rp-amarillo); background: var(--surface-2); padding: 10px 14px; border-radius: 0 6px 6px 0;
+  color: var(--ink-2); font-size: 14px; }
+.nota b { color: var(--ink); }
+.chip { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2);
+  border: 1px solid var(--line-2); color: var(--ink-2); white-space: nowrap; }
+.chip.Mec, .chip.mec { background: var(--quita-suave); border-color: transparent; color: var(--quita); font-weight: 700; }
+.leyenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; }
+.leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 5px; }
+.leyenda i.raya { height: 3px; vertical-align: 3px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { font-family: Tahoma, Verdana, Geneva, sans-serif; fill: var(--muted); font-size: 12px; }
+svg .eje { stroke: var(--line-2); } svg .rej { stroke: var(--line); }
+.fila { cursor: pointer; }
+.fila:hover rect.fondo { fill: var(--surface-2); }
+/* causas */
+.causas { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 16px; align-items: start; }
+.pila > *, .grid2 > *, .causas > * { min-width: 0; }
+.lista-causas { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 56px; }
+.lista-causas a { display: flex; justify-content: space-between; gap: 8px; text-decoration: none; padding: 8px 10px;
+  border-radius: 6px; border: 1px solid transparent; font-size: 14px; }
+.lista-causas a:hover { background: var(--surface); border-color: var(--line); }
+.lista-causas a[aria-current="true"] { background: var(--surface); border-color: var(--line-2); box-shadow: var(--sombra); font-weight: 700; }
+.lista-causas .g { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 10px 10px 2px; }
+.t-q { color: var(--quita); font-weight: 700; } .t-s { color: var(--suma); font-weight: 700; }
+.cifra { font-size: 30px; font-weight: 700; line-height: 1.1; }
+/* tablas */
+.tabla { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); font-weight: 700; background: var(--surface-2); position: sticky; top: 0; }
+th button { background: none; border: 0; padding: 0; font-weight: 700; color: inherit; cursor: pointer; font-size: 12px; }
+td.n, th.n { text-align: right; }
+tbody tr[tabindex] { cursor: pointer; }
+tbody tr[tabindex]:hover { background: var(--surface-2); }
+.barrita { display: inline-block; height: 10px; border-radius: 2px; vertical-align: middle; }
+.filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.filtros input, .filtros select { font: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--line-2); border-radius: 6px;
+  background: var(--surface); color: var(--ink); }
+.filtros label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.btn { border: 1px solid var(--line-2); background: var(--surface); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 14px; }
+.btn[aria-pressed="true"] { background: var(--rp-negro); color: #fff; border-color: var(--rp-negro); }
+/* ficha */
+.cab { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: flex-end; }
+.cab .datos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.tres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tres > div { border-top: 4px solid var(--line-2); padding-top: 6px; }
+.tres .r { border-color: var(--real); } .tres .h { border-color: var(--hist); } .tres .p { border-color: var(--ppto-fill); }
+.tres .v { font-size: 24px; font-weight: 700; }
+.tres .et { font-size: 12px; color: var(--muted); }
+.porque td.dato { white-space: normal; color: var(--ink-2); min-width: 220px; }
+.imgs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.imgs figure { margin: 0; }
+.imgs img { width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--line); display: block; }
+.imgs figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.sat { margin: 0; }
+.sat img { max-width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--line); display: block; background: #fff; }
+.sat figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.volver { font-size: 14px; color: var(--muted); text-decoration: none; }
+.volver:hover { color: var(--ink); }
+.cargando { color: var(--muted); padding: 40px 0; }
+footer { max-width: 1240px; margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 12px; }
+@media (max-width: 860px) {
+  .causas { grid-template-columns: 1fr; }
+  .lista-causas { position: static; flex-direction: row; overflow-x: auto; }
+  .lista-causas .g { display: none; }
+  .lista-causas a { flex: none; }
+  .tres .v { font-size: 20px; }
+  header.marca h1 { font-size: 20px; }
+}
+@media (prefers-reduced-motion: no-preference) { nav.tabs a { transition: color .15s, border-color .15s; } }
+</style>
+</head>
+<body>
+<header class="marca">
+  <div class="in">
+    <img src="img/logo-riopaila.png" alt="Riopaila Agrícola">
+    <div>
+      <h1>Caída del TCH · Riopaila 2026</h1>
+      <p>Cosechas de enero a septiembre · cada causa con sus suertes y cada suerte con su soporte</p>
+    </div>
+  </div>
+</header>
+<div class="linea"></div>
+<nav class="tabs" aria-label="Secciones">
+  <div class="in">
+    <a href="#resumen" data-v="resumen">Resumen</a>
+    <a href="#causa/mecanica" data-v="causa">Causas</a>
+    <a href="#suertes" data-v="suertes">Suertes</a>
+    <a href="#prueba" data-v="prueba">Prueba del modelo</a>
+    <a href="#metodo" data-v="metodo">Método y fuentes</a>
+  </div>
+</nav>
+<main id="app"><p class="cargando">Cargando datos…</p></main>
+<footer>Riopaila Agrícola · Estimados y TCH · Datos: ZQM y G&amp;P 2026, Maestro de Suertes 2026, EMA La Paila y Bugalagrande,
+Registro de NF de Ingeniería Agrícola, riegos, labores y Sentinel-2. Todo calculado con variables medidas; sin calificaciones.</footer>
+<script src="app.js"></script>
+</body>
+</html>

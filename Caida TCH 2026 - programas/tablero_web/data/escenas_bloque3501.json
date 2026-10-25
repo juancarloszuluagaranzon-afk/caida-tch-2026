@@ -1,0 +1,42 @@
+[
+ {
+  "escena": "manual_100d",
+  "fecha": "2024-10-24",
+  "ciclo": "después del corte manual de jul-2024",
+  "corte": "2024-07",
+  "despejado": 1,
+  "ndvi": 0.79,
+  "ndmi": 0.301,
+  "rala_pct": 0.3
+ },
+ {
+  "escena": "mecanica_100d",
+  "fecha": "2025-10-22",
+  "ciclo": "después del primer corte mecánico, jul-2025",
+  "corte": "2025-07",
+  "despejado": 1,
+  "ndvi": 0.671,
+  "ndmi": 0.164,
+  "rala_pct": 22.0
+ },
+ {
+  "escena": "manual_150d",
+  "fecha": "2024-12-11",
+  "ciclo": "después del corte manual de jul-2024",
+  "corte": "2024-07",
+  "despejado": 0.985,
+  "ndvi": 0.822,
+  "ndmi": 0.385,
+  "rala_pct": 3.7
+ },
+ {
+  "escena": "mecanica_150d",
+  "fecha": "2025-12-08",
+  "ciclo": "después del primer corte mecánico, jul-2025",
+  "corte": "2025-07",
+  "despejado": 1,
+  "ndvi": 0.747,
+  "ndmi": 0.244,
+  "rala_pct": 1.7
+ }
+]

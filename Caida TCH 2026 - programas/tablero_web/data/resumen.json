@@ -1,0 +1,19 @@
+{
+ "periodo": "enero a septiembre de 2026",
+ "cosechas": 305,
+ "cosechas_total": 317,
+ "ha": 2717.0,
+ "real": 110.3,
+ "hist": 116.6,
+ "caida": 6.3,
+ "caida_pct": -5.4,
+ "t_caida": 17107.0,
+ "sin_explicar": -0.61,
+ "puente": {
+  "cosechas": 284,
+  "ha": 2543.0,
+  "ppto": 128.2,
+  "hist": 115.9,
+  "real": 110.5
+ }
+}

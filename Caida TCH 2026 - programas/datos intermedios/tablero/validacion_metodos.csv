@@ -1,0 +1,8 @@
+metodo,objetivo,r2,nota
+Nuestro modelo + notas de la matriz (matriz ponderada),Caída frente a la historia de la suerte,0.244,validación cruzada en 5 partes dentro de 2026; las notas (sin la de variedad) explican lo que el modelo no explicó
+Nuestro modelo (no vio 2026),Caída frente a la historia de la suerte,0.166,ajustado con 2011-2025; predice cada suerte de 2026 sin conocerla
+Nuestro modelo (no vio esas suertes de 2026),Caída frente a la historia de la suerte,0.203,"validación cruzada en 5 partes dentro de 2026: conoce el año por las demás suertes, como la Ridge"
+Calificaciones 1-3-5 sin la de variedad,Caída frente a la historia de la suerte,0.223,"Ridge, validación cruzada en 5 partes"
+Calificaciones 1-3-5 con la de variedad,Caída frente a la historia de la suerte,0.57,la nota de variedad sale del mismo TCH
+Calificaciones 1-3-5 sin la de variedad,Brecha frente al presupuesto (AgroFactors),-0.024,"Ridge, validación cruzada en 5 partes"
+Calificaciones 1-3-5 con la de variedad,Brecha frente al presupuesto (AgroFactors),0.385,así lo calcula el AgroFactors; la nota de variedad sale del mismo TCH
