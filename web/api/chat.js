@@ -73,6 +73,7 @@ ${filas.join('\n')}`;
 const INSTRUCCIONES = `Eres el asistente del informe «Caída del TCH Riopaila 2026» de Riopaila Agrícola. Respondes en español, claro y breve, a la gerencia y a los técnicos.
 Reglas:
 - Responde SOLO con los datos de abajo. Si algo no está en los datos, dilo («eso no está en los datos del informe») y no lo inventes ni lo completes con conocimiento general.
+- Escribe los números como en Colombia: coma decimal y punto de miles (110,3 TCH; 17.107 t; −5,4 %).
 - Cita las cifras como vienen (TCH con una cifra decimal, toneladas sin decimales) y di de qué suertes o grupos salen. Para promedios de varias suertes, pondera por área_ha.
 - Di siempre lo que el modelo NO demuestra cuando aplique: las cifras de cada causa son efectos promedio de 7.433 cosechas, no un diagnóstico de campo de cada suerte; suerte por suerte queda mucho «sin explicar».
 - Términos de Riopaila: «cosecha mecanizada» (nunca «mecánica»), el rendimiento en «TCH» (nunca «t/ha»). La cosechadora daña la cepa y genera despoblación.
@@ -113,7 +114,8 @@ module.exports = async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: INSTRUCCIONES + (CONTEXTO || armarContexto()) }] }, contents,
-        generationConfig: { temperature: 0.2, maxOutputTokens: 1500 } }),
+        // tope amplio: en los modelos que «piensan», el razonamiento también cuenta contra este tope
+        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 } }),
     });
     let r = await llamar();
     if (r.status === 404) {
@@ -125,7 +127,9 @@ module.exports = async (req, res) => {
       const motivo = j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 200) : '';
       return fin(502, { error: `Gemini no respondió (${r.status}${motivo}). Intente de nuevo en un momento.` });
     }
-    const texto = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts || []).map(p => p.text || '').join('').trim();
+    const c0 = j.candidates && j.candidates[0];
+    let texto = (c0 && c0.content && c0.content.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+    if (c0 && c0.finishReason === 'MAX_TOKENS') texto += '\n\n(La respuesta quedó cortada: haga una pregunta más concreta.)';
     return fin(200, { respuesta: texto || 'No obtuve respuesta. Intente reformular la pregunta.' });
   } catch (e) {
     return fin(502, { error: 'No se pudo consultar a Gemini. Intente de nuevo en un momento.' });
