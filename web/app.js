@@ -409,7 +409,8 @@ function soporte(id, el) {
     specs = [{ x: sp.ha.map(r => r[0]), series: [{ valores: sp.ha.map(r => r[1]), colores: sp.ha.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 0 }], destacarX: sp.ha.length - 1, yfmt: v => nf(v, 0), anchoEt: 40 }];
   } else if (id === 'corte') {
     const leyHa = leyenda([['var(--quita)', '2026'], ['var(--hist)', 'Normal: mezcla de 2020-25 en la misma área de 2026']]);
-    html = caja('Lo que pierde la soca en cada corte (TCH frente a la plantilla)', `Misma suerte; efecto medido en 7.433 cosechas 2011-2026, llevado a TCH con el TCH promedio de las plantillas 2020-25 (${nf(sp.plantilla_tch)} TCH)`) +
+    html = porQueCorte(sp) +
+      caja('Lo que pierde la soca en cada corte (TCH frente a la plantilla)', `Misma suerte; efecto medido en 7.433 cosechas 2011-2026, llevado a TCH con el TCH promedio de las plantillas 2020-25 (${nf(sp.plantilla_tch)} TCH)`) +
       caja('Área cosechada por número de corte (ha)', `Promedio: 2026 ${nf(sp.prom[0])} cortes · normal ${nf(sp.prom[1])} cortes. Más segundos cortes y menos socas de 6 o más.`, leyHa);
     specs = [{ x: sp.efecto.map(r => r[0]), series: [{ valores: sp.efecto.map(r => r[2]), color: 'var(--quita)', etiquetas: true, d: 1 }], yfmt: v => nf(v, 0), alto: 210 },
       { x: sp.mezcla.map(r => r[0]), series: [{ valores: sp.mezcla.map(r => r[4]), color: 'var(--hist)', d: 0 }, { valores: sp.mezcla.map(r => r[3]), color: 'var(--quita)', d: 0 }], anchoEt: 64, yfmt: v => nf(v, 0) }];
@@ -434,6 +435,31 @@ function soporte(id, el) {
       { t: 'Cambio rebrote ralo', n: true, f: r => `<span class="${r.dr > 5 ? 't-q' : ''}">${sg(r.dr, 0)} pts</span>`, v: r => r.dr },
       { t: 'Imagen', f: r => r.foto ? 'sí' : '—', v: null }], rows, { pie: 'NDVI más bajo o rebrote más ralo que después del corte manual = peor' });
   }
+}
+
+// por qué el número de corte sumó en 2026: cada suerte frente al corte promedio de su propia historia (lo usan la causa y la gerencia)
+function porQueCorte(sp, enDoc) {
+  if (!sp.grupos) return '';
+  const tot = sp.grupos.reduce((x, g) => x + g[6], 0), ha = sp.grupos.reduce((x, g) => x + g[2], 0);
+  const pl = sp.plantillas, e = sp.ejemplo, se = e && S.find(s => s.s === e[0]);
+  const desde23 = pl.por_anio.reduce((x, r) => x + r[1], 0);
+  const tabla = `<div class="tabla"><table><thead><tr><th>Cada suerte frente a su historia 2020-25</th><th class="n">Cosechas</th><th class="n">Área (ha)</th>
+    <th class="n">Corte 2026</th><th class="n">Corte en su historia</th><th class="n">Le sumó o quitó (TCH)</th><th class="n">Toneladas</th></tr></thead><tbody>
+    ${sp.grupos.map(g => `<tr><td>${esc(g[0])}</td><td class="n">${g[1]}</td><td class="n">${nf(g[2], 0)}</td><td class="n">${nf(g[3])}</td><td class="n">${nf(g[4])}</td>
+      <td class="n"><b class="${clsImp(g[5])}">${sg(g[5])}</b></td><td class="n ${clsImp(g[6])}">${sg(g[6], 0)}</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td class="n">${sp.grupos.reduce((x, g) => x + g[1], 0)}</td><td class="n">${nf(ha, 0)}</td><td></td><td></td>
+      <td class="n"><b class="${clsImp(tot / ha)}">${sg(tot / ha)}</b></td><td class="n"><b class="${clsImp(tot)}">${sg(tot, 0)}</b></td></tr></tbody></table></div>`;
+  const txt = `<p><b>Por qué sumó.</b> Cada suerte se compara consigo misma: su corte de 2026 frente al corte promedio que tuvo en 2020-25. Cada corte le quita TCH a la soca,
+      así que una suerte que en 2026 está más joven que en su historia gana frente a su propio promedio, y una que está más vieja pierde.
+      Las que envejecieron sí restaron, pero las renovadas sumaron más: el neto fue ${sg(tot, 0)} t, ${sg(tot / ha)} TCH en promedio.</p>
+    ${tabla}
+    <p style="margin-top:8px"><b>Por qué hubo tantas suertes jóvenes.</b> Por la renovación: de las ${pl.jovenes} cosechas más jóvenes que su historia, ${desde23} tuvieron una plantilla
+      cosechada desde 2023 (${pl.por_anio.map(r => `${r[1]} en ${r[0]}`).join(', ')}). Por eso en 2026 se cosechó el doble de segundos cortes y la mitad de socas de 6º-7º que lo normal.</p>
+    ${e ? `<p><b>Ejemplo:</b> la suerte ${se ? `<a href="${hrefS(se.k)}">${esc(e[0])}</a>` : esc(e[0])}${se && se.h ? ` (${esc(se.h)})` : ''} fue en 2020-25 una soca de ${e[1]} a ${e[2]} cortes
+      con ${nf(e[3])} TCH en promedio; se renovó y en 2026 ${e[4] === 1 ? 'se cosechó la plantilla' : `se cosechó en ${e[4]}º corte`}: ${nf(e[5])} TCH. Solo por estar más joven, el modelo le atribuye ${sg(e[6])} TCH.</p>` : ''}
+    <p${enDoc ? '' : ' class="nota" style="margin:0"'}><b>Lo que hay que leer.</b> Este ${sg(tot / ha)} TCH no es una mejora de manejo: es el ciclo de renovación, que rejuveneció el cañaduzal
+      y tapó parte de la caída. Las suertes renovadas van a envejecer año tras año: si no se sigue renovando al mismo ritmo, este factor dejará de sumar y empezará a restar.</p>`;
+  return enDoc ? txt : `<div class="pila"><h3 style="margin:0">Por qué el número de corte sumó en 2026</h3>${txt}</div>`;
 }
 
 // rebrote visto por el satélite: grupo frente a su control, a la misma edad de la soca
@@ -806,8 +832,9 @@ function vGerencia() {
         Roturar o fertilizar con el suelo húmedo (lluvia en los 5 días antes) se probó y no mostró un efecto confiable.</p></section>
 
     <section><h3>Número de corte, edad de cosecha y variedades</h3>
-      ${co ? `<p><b>Cada corte resta, pero en 2026 se cosecharon socas más jóvenes.</b> Frente a la plantilla, en la misma suerte: ${co.efecto.map(r => `${r[0]} ${sg(r[2])} TCH`).join(', ')} (sobre el TCH de las plantillas 2020-25, ${nf(co.plantilla_tch)}).
-        En 2026 el corte promedio fue ${nf(co.prom[0])} contra ${nf(co.prom[1])} normal, por eso este factor sumó ${ap('corte')} TCH.</p>
+      ${co ? `<p><b>Número de corte (${ap('corte')} TCH): cada corte resta, pero en 2026 se cosecharon socas más jóvenes.</b> Frente a la plantilla, en la misma suerte: ${co.efecto.map(r => `${r[0]} ${sg(r[2])} TCH`).join(', ')} (sobre el TCH de las plantillas 2020-25, ${nf(co.plantilla_tch)}).
+        En 2026 el corte promedio fue ${nf(co.prom[0])} contra ${nf(co.prom[1])} normal.</p>
+      ${porQueCorte(co, true)}
       ${tb(['Corte', ...co.mezcla.map(r => r[0])], [['Área 2026 (ha)', ...co.mezcla.map(r => nf(r[3], 0))], ['Normal (ha)', ...co.mezcla.map(r => nf(r[4], 0))]], co.mezcla.map((_, i) => i + 1))}` : ''}
       ${ed ? `<p style="margin-top:10px"><b>Edad de cosecha (${ap('edad')} TCH).</b> En 2026 se cortó con ${nf(ed.prom[0])} meses en promedio, contra ${nf(ed.prom[1])} normal:
         ${nf((ed.e.find(r => r[0] === '12-13') || [])[3], 0)} ha se cortaron entre 12 y 13 meses (normal ${nf((ed.e.find(r => r[0] === '12-13') || [])[4], 0)} ha). Cortar con más edad da más toneladas.</p>` : ''}

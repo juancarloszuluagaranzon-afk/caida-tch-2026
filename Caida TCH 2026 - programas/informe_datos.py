@@ -419,6 +419,24 @@ sop["corte"] = {"efecto": [[r.corte, r1(r.efecto_pct), r1(r.efecto_pct / 100 * T
                 "mezcla": [[k, r1(100 * v["2026"]), r1(100 * v["normal"]), r1(HAQ * v["2026"], 0), r1(HAQ * v["normal"], 0)]
                            for k, v in EC["mezcla"].iterrows()],
                 "prom": [r1(EC["corte_2026"]), r1(EC["corte_normal"])]}
+# por qué sumó el número de corte: cada suerte frente al corte promedio de su propia historia 2020-25
+# (las renovadas en 2023-25 llegan a 2026 jóvenes y su historia era de socas viejas)
+hc = ds[ds.anio.between(2020, 2025)].groupby("ste").apply(lambda g: np.average(g.Corte, weights=g.Area))
+gc = pd.DataFrame({"ste": q.ste, "c": q.Corte, "ch": q.ste.map(hc), "a": S.area, "imp": -S["N° de corte"],
+                   "hist": S.tch_hist, "real": S.tch_real})[S.tch_hist.notna()]
+gc["dif"] = gc.c - gc.ch
+wc = lambda g, k: float(np.average(g[k], weights=g.a))  # noqa: E731
+GRC = [("Mucho más jóvenes que su historia (renovadas)", gc.dif <= -2), ("Algo más jóvenes", (gc.dif > -2) & (gc.dif < 0)),
+       ("Parecidas (hasta 2 cortes más)", (gc.dif >= 0) & (gc.dif < 2)), ("Más viejas (2 cortes o más)", gc.dif >= 2)]
+sop["corte"]["grupos"] = [[n, int(m.sum()), r1(gc.a[m].sum(), 0), r1(wc(gc[m], "c")), r1(wc(gc[m], "ch")), r1(wc(gc[m], "imp")),
+                           r1(float((gc.imp * gc.a)[m].sum()), 0)] for n, m in GRC if m.sum()]   # [grupo, cosechas, ha, corte 2026, corte historia, TCH, t]
+ultp = ds[ds.Corte == 1].groupby("ste").anio.max()
+jov = gc[gc.dif < 0]
+sop["corte"]["plantillas"] = {"jovenes": int(len(jov)),
+                              "por_anio": [[int(y), int(n)] for y, n in jov.ste.map(ultp).value_counts().sort_index().items() if y >= 2023]}
+e = gc.loc[gc.imp.idxmax()]
+he = ds[ds.anio.between(2020, 2025) & (ds.ste == e.ste)]
+sop["corte"]["ejemplo"] = [e["ste"], int(he.Corte.min()), int(he.Corte.max()), r1(e["hist"]), int(e["c"]), r1(e["real"]), r1(e["imp"])]   # [suerte, corte mín y máx 2020-25, TCH hist, corte 2026, TCH real, TCH del factor]
 guardar({"causas": CAUSAS, "soporte": sop, "tch_base": r1(TN)}, "causas.json")   # TCH con que se llevan los % a TCH
 
 # ---------------------------------------------------------------- resumen y validación
