@@ -4,6 +4,7 @@
 
 const $app = document.getElementById('app');
 let R, C, S, F, V, E, CAUSA, SUERTE;
+let DV = null, AFO = {};   // aforo frente al óptimo de la variedad (desarrollo.json, desarrollo_optimo.py); opcional
 let vistaActual = '';
 
 // ---------------------------------------------------------------- formatos
@@ -373,7 +374,7 @@ function soporte(id, el) {
     const mx = Math.max(...sp.tabla.map(r => Math.abs(r[3])));
     html = `<div><h3>Suertes cosechadas en 2026 frente a su propia historia 2015-25, según cómo fue el corte anterior</h3>
       ${divergentes(sp.tabla.map(r => ({ et: `${ANT[r[0]] || r[0]} · ${r[1]} cosechas`, v: r[3], color: r[0].startsWith('mec') ? 'var(--quita)' : r[3] < 0 ? 'var(--hist)' : 'var(--suma)' })), { max: mx })}
-      <p class="sub" style="margin-top:6px">Cambio del TCH en %. Las que venían de un corte mecanizado cayeron casi el doble.</p></div>` +
+      <p class="sub" style="margin-top:6px">Cambio del TCH en %. Las que venían de un corte mecanizado cayeron casi el doble.</p></div>` + afoCorte() +
       caja('El satélite lo ve: NDVI de la soca frente a la que salió de corte manual', 'Diferencia por mes de edad, misma suerte y mismo mes del año (3.500 ciclos 2019-2026)',
         leyenda([['var(--quita)', 'Corte anterior mecanizado, primera vez', 1], ['var(--mec)', 'Mecanizado repetido', 1]])) +
       caja('NDMI (humedad del follaje), igual', '', leyenda([['var(--quita)', 'Primera vez', 1], ['var(--mec)', 'Repetido', 1]])) +
@@ -529,6 +530,121 @@ function vCausa(id) {
   }
 }
 
+// ---------------------------------------------------------------- desarrollo de la caña: aforo frente al óptimo de la variedad
+const afo = s => AFO[s.s + '|' + s.m];
+const pctO = (r, k) => 100 * r[k] / r['o' + k];
+// peso de caña ∝ tallos × altura × diámetro² (volumen del tallo), frente al mismo producto del óptimo
+const pesoO = r => 100 * (r.pob * r.alt * r.dia ** 2) / (r.opob * r.oalt * r.odia ** 2);
+const clsO = v => Math.round(v) < 95 ? 't-q' : Math.round(v) > 105 ? 't-s' : '';   // con el valor redondeado que se muestra
+const MEDO = { pob: 'Población', alt: 'Altura', dia: 'Diámetro', peso: 'Peso de caña' };
+const UNI = { pob: 'tallos/m', alt: 'cm', dia: 'cm' };
+
+let filtroDes = { ...FILTRO0 };
+function vDesarrollo() {
+  if (!DV) { $app.innerHTML = '<p>No están los datos del aforo (desarrollo.json).</p>'; return; }
+  $app.innerHTML = `<div class="pila">
+    <div><h2>¿La caña tuvo el desarrollo óptimo de su variedad?</h2>
+      <p class="sub" id="des-sub"></p></div>
+    ${filtrosHtml(filtroDes)}<div id="des-cuerpo" class="pila"></div></div>`;
+  escucharFiltros(() => { filtroDes = leerFiltros(); pintarDesarrollo(filtroDes); });
+  pintarDesarrollo(filtroDes);
+}
+
+function pintarDesarrollo(f) {
+  const filtrado = textoFiltro(f), base = filtrar(f), rows = base.filter(afo).map(s => ({ s, r: afo(s) }));
+  const ha = rows.reduce((x, o) => x + o.s.a, 0);
+  const pond = (L, fn) => { const a = L.reduce((x, o) => x + o.s.a, 0); return a ? L.reduce((x, o) => x + fn(o) * o.s.a, 0) / a : null; };
+  const bajo = (L, k) => 100 * L.filter(o => pctO(o.r, k) < 95).reduce((x, o) => x + o.s.a, 0) / L.reduce((x, o) => x + o.s.a, 0);
+  document.getElementById('des-sub').innerHTML = `${filtrado ? `Filtro: <b>${esc(filtrado)}</b> · ` : ''}${rows.length} de ${base.length} cosechas con aforo y óptimo de su variedad (${nf(ha, 0)} ha).
+    Aforo de la caña en pie antes de la cosecha, frente al óptimo de su variedad.${filtrado ? ' <button type="button" id="des-limpiar" class="limpiar">Quitar filtros</button>' : ''}`;
+  const lim = document.getElementById('des-limpiar');
+  if (lim) lim.onclick = () => { filtroDes = { ...FILTRO0 }; vDesarrollo(); };
+  const $c = document.getElementById('des-cuerpo');
+  if (!rows.length) { $c.innerHTML = '<div class="nota">Ninguna cosecha con aforo cumple el filtro.</div>'; return; }
+  const kpi = (k, sub) => { const v = pond(rows, o => k === 'peso' ? pesoO(o.r) : pctO(o.r, k));
+    return `<div class="kpi"><div class="et">${MEDO[k]} frente al óptimo</div><div class="v num ${clsO(v)}">${nf(v, 0)} <small>%</small></div><div class="pie">${sub}</div></div>`; };
+  // peso de caña frente al óptimo y cambio del TCH frente a la historia
+  const G = [['Menos de 80 %', 0, 80], ['80-90 %', 80, 90], ['90-100 %', 90, 100], ['100-110 %', 100, 110], ['110 % o más', 110, 1e9]];
+  const conH = rows.filter(o => o.s.hist != null);
+  const grupos = G.map(([et, lo, hi]) => { const L = conH.filter(o => pesoO(o.r) >= lo && pesoO(o.r) < hi);
+    return L.length ? { et: `${et} · ${L.length} cosechas`, v: 100 * (pond(L, o => o.s.real) / pond(L, o => o.s.hist) - 1),
+      dato: `${nf(L.reduce((x, o) => x + o.s.a, 0), 0)} ha · historia ${nf(pond(L, o => o.s.hist))} → real ${nf(pond(L, o => o.s.real))} TCH` } : null; }).filter(Boolean);
+  // por variedad
+  const vars = {};
+  rows.forEach(o => (vars[o.r.v] = vars[o.r.v] || []).push(o));
+  const tv = Object.entries(vars).sort((a, b) => b[1].reduce((x, o) => x + o.s.a, 0) - a[1].reduce((x, o) => x + o.s.a, 0));
+  const celda = v => `<td class="n"><span class="${clsO(v)}">${nf(v, 0)} %</span></td>`;
+  // corte anterior (modelo con todas las suertes)
+  const pr = (k, ant) => DV.pruebas.find(x => x.k === k && x.ant === ant);
+  const celdaP = x => `<td class="n"><span class="${x.p < 0.05 ? clsImp(x.dif) : ''}">${sg(x.dif)} pts</span> <span class="sub">(${x.p < 0.05 ? 'p = ' + nf(x.p, 2) : 'no confiable'})</span></td>`;
+  const tc = k => DV.tch.find(x => x.y === 'y_hist' && x.k === k);
+  $c.innerHTML = `${rows.length < 20 ? `<div class="nota"><b>Pocas cosechas.</b> Son ${rows.length} cosechas con aforo: los promedios dependen de unas pocas suertes.</div>` : ''}
+    <div class="kpis">${kpi('pob', `${nf(bajo(rows, 'pob'), 0)} % del área por debajo de 95 %`)}${kpi('alt', `${nf(bajo(rows, 'alt'), 0)} % del área por debajo de 95 %`)}
+      ${kpi('dia', `${nf(bajo(rows, 'dia'), 0)} % del área por debajo de 95 %`)}${kpi('peso', 'tallos × altura × diámetro²')}</div>
+    <div class="grid2">
+      <div class="caja"><h3>Menos caña que el óptimo, más caída del TCH</h3>
+        <p class="sub" style="margin-bottom:8px">Cosechas agrupadas por su peso de caña frente al óptimo de su variedad · cambio del TCH real frente a su historia 2020-25 (%)</p>
+        ${divergentes(grupos)}
+        <p class="sub" style="margin:10px 0 0">En la misma variedad, cada 1 % de población por debajo del óptimo va con ${nf(tc('pob').coef, 1)} % menos de TCH;
+          altura ${nf(tc('alt').coef, 1)} % y diámetro ${nf(tc('dia').coef, 1)} % (todas las suertes, sin filtro).</p></div>
+      <div class="caja"><h3>Según el corte anterior</h3>
+        <p class="sub" style="margin-bottom:8px">Diferencia frente a las que venían de corte manual, en puntos de % del óptimo, misma variedad y zona (todas las suertes, sin filtro).
+          El aforo se mide antes de la cosecha de 2026: la población que encuentra la dejó el corte anterior.</p>
+        <div class="tabla"><table><thead><tr><th>Medida</th><th class="n">Mecanizado, primera vez</th><th class="n">Mecanizado, repetido</th></tr></thead><tbody>
+          ${['p_pob', 'p_alt', 'p_dia', 'p_peso'].map(k => `<tr><td>${MEDO[k.slice(2)]}</td>${celdaP(pr(k, 'mecánica tras manual'))}${celdaP(pr(k, 'mecánica seguida'))}</tr>`).join('')}
+        </tbody></table></div></div>
+    </div>
+    <div class="caja"><h3>Por variedad</h3>
+      <p class="sub" style="margin-bottom:8px">% del óptimo de cada variedad, ponderado por área. Rojo: más de 5 % por debajo; verde: más de 5 % por encima.</p>
+      <div class="tabla"><table><thead><tr><th>Variedad</th><th class="n">Cosechas</th><th class="n">Área (ha)</th><th class="n">Población</th><th class="n">Altura</th><th class="n">Diámetro</th><th class="n">Peso de caña</th><th class="n">Óptimo (tallos/m · cm · cm)</th></tr></thead><tbody>
+        ${tv.map(([v, L]) => `<tr><td>${esc(v)}</td><td class="n">${L.length}</td><td class="n">${nf(L.reduce((x, o) => x + o.s.a, 0), 0)}</td>
+          ${celda(pond(L, o => pctO(o.r, 'pob')))}${celda(pond(L, o => pctO(o.r, 'alt')))}${celda(pond(L, o => pctO(o.r, 'dia')))}${celda(pond(L, o => pesoO(o.r)))}
+          <td class="n sub">${nf(L[0].r.opob)} · ${nf(L[0].r.oalt, 0)} · ${nf(L[0].r.odia, 2)}</td></tr>`).join('')}
+      </tbody></table></div></div>
+    <div class="caja"><h3>Suertes</h3><p class="sub" style="margin-bottom:8px">Ordenadas de menos a más caña frente al óptimo. Toque una para ver su ficha.</p><div id="t-des"></div></div>
+    <div class="nota"><b>Lo que esto no demuestra.</b> El desarrollo de la caña no es una causa más: es el camino por el que actúan el calor, la sequía
+      o la cosecha mecanizada, por eso no entra en la gráfica de causas (se contaría dos veces). La relación con el TCH es en parte obvia, porque el aforo
+      estima las toneladas. El óptimo de cada variedad viene de la tabla de óptimos (columnas de promedio: si es un promedio y no un máximo, 95 % está cerca de lo normal).
+      La matriz no trae la edad de cada aforo. Sin aforo: ${DV.sin_aforo} cosechas; sin óptimo de su variedad: ${esc(DV.sin_optimo.join(', '))}.</div>`;
+  enlazarFilas($c);
+  tabla(document.getElementById('t-des'), [...colSuerte, { t: 'Variedad', f: s => esc(afo(s).v), v: s => afo(s).v, asc: true },
+    { t: 'Corte anterior', f: s => esc(ANT[s.ant] || s.ant), v: s => s.ant },
+    ...['pob', 'alt', 'dia'].map(k => ({ t: MEDO[k], n: true, f: s => `<span class="${clsO(pctO(afo(s), k))}">${nf(pctO(afo(s), k), 0)} %</span>`, v: s => pctO(afo(s), k), asc: true })),
+    { t: 'Peso de caña', n: true, f: s => `<b class="${clsO(pesoO(afo(s)))}">${nf(pesoO(afo(s)), 0)} %</b>`, v: s => pesoO(afo(s)), asc: true },
+    { t: 'TCH real', n: true, f: s => nf(s.real), v: s => s.real },
+    { t: 'vs historia', n: true, f: s => s.hist == null ? '—' : `<span class="${clsImp(s.real - s.hist)}">${sg(s.real - s.hist)}</span>`, v: s => s.hist == null ? null : s.real - s.hist, asc: true }],
+    rows.map(o => o.s), { orden: 8, dir: 1 });
+}
+
+// recuadro de la ficha: el aforo de la suerte frente al óptimo de su variedad
+function afoFicha(s) {
+  const r = afo(s);
+  if (!r) return DV ? `<div class="caja"><h3>Desarrollo de la caña frente al óptimo</h3><p class="sub" style="margin:0">Esta cosecha no tiene aforo en la matriz o su variedad no tiene óptimo.</p></div>` : '';
+  const fila = k => `<tr><td>${MEDO[k]} (${UNI[k]})</td><td class="n">${nf(r[k], k === 'alt' ? 0 : k === 'dia' ? 2 : 1)}</td><td class="n">${nf(r['o' + k], k === 'alt' ? 0 : k === 'dia' ? 2 : 1)}</td>
+    <td class="n"><b class="${clsO(pctO(r, k))}">${nf(pctO(r, k), 0)} %</b></td></tr>`;
+  return `<div class="caja"><h3>Desarrollo de la caña frente al óptimo de ${esc(r.v)}</h3>
+    <p class="sub" style="margin-bottom:8px">Aforo de la caña en pie antes de la cosecha. Rojo: más de 5 % por debajo del óptimo.</p>
+    <div class="tabla"><table><thead><tr><th>Medida</th><th class="n">Aforo</th><th class="n">Óptimo</th><th class="n">% del óptimo</th></tr></thead><tbody>
+      ${fila('pob')}${fila('alt')}${fila('dia')}
+      <tr><td><b>Peso de caña</b> (tallos × altura × diámetro²)</td><td></td><td></td><td class="n"><b class="${clsO(pesoO(r))}">${nf(pesoO(r), 0)} %</b></td></tr>
+    </tbody></table></div><p class="sub" style="margin:6px 0 0"><a href="#desarrollo">Ver todas las suertes y variedades</a></p></div>`;
+}
+
+// recuadro de la causa «Corte anterior mecanizado»: lo que encontró el aforo
+function afoCorte() {
+  if (!DV) return '';
+  const pr = (k, ant) => DV.pruebas.find(x => x.k === k && x.ant === ant);
+  const filas = [['p_peso', 'Peso de caña'], ['p_alt', 'Altura'], ['p_pob', 'Población'], ['p_dia', 'Diámetro']];
+  return `<div><h3>El aforo también lo ve: menos caña donde el corte anterior fue mecanizado</h3>
+    <p class="sub" style="margin-bottom:8px">Aforo de la caña en pie de ${DV.filas.length} cosechas 2026, como % del óptimo de su variedad; diferencia frente a las que
+      venían de corte manual, misma variedad y zona (puntos de %).</p>
+    ${divergentes(filas.flatMap(([k, et]) => [['mecánica tras manual', 'primera vez'], ['mecánica seguida', 'repetido']].map(([a, t]) => {
+      const x = pr(k, a); return { et: `${et} · ${t}`, v: x.dif, color: x.p < 0.05 ? (x.dif < 0 ? 'var(--quita)' : 'var(--suma)') : 'var(--hist)',
+        dato: x.p < 0.05 ? `confiable (p = ${nf(x.p, 2)})` : `no confiable (p = ${nf(x.p, 2)})` }; })), { max: 10 })}
+    <p class="sub" style="margin-top:6px">Gris = la diferencia no es confiable. Tres mediciones distintas (báscula, satélite y aforo) apuntan en la misma dirección.
+      <a href="#desarrollo">Ver el desarrollo de la caña</a></p></div>`;
+}
+
 // ---------------------------------------------------------------- vista: suertes
 function vSuertes() {
   $app.innerHTML = `<div class="pila"><div><h2>Suertes cosechadas en 2026</h2>
@@ -595,6 +711,7 @@ function vFicha(k) {
       <div class="caja"><h3>Satélite: vigor (NDVI) por mes de edad</h3><p class="sub" style="margin-bottom:6px">Ciclo 2026 frente a los ciclos anteriores de la misma suerte (Sentinel-2, meses despejados)</p>
         <div id="g-ndvi"></div><div id="ley-sat"></div><h3 style="margin-top:10px">Humedad del follaje (NDMI)</h3><div id="g-ndmi"></div></div>
     </div>
+    ${afoFicha(s)}
     ${s.satA ? satFoto(s.satA, 'Satélite: la soca después del corte manual y después del primer corte mecanizado',
        'El corte anterior de esta suerte fue el primero mecanizado. Las dos imágenes muestran la soca a la misma edad después de cada corte.') : ''}
     ${s.satB ? satFoto(s.satB, 'Alerta 2027: la soca que dejó la cosecha mecanizada de 2026',
@@ -709,9 +826,10 @@ function ruta(redibujo) {
     const on = a.dataset.v === v || (a.dataset.v === 'suertes' && v === 'suerte');
     on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
   });
-  const titulo = { resumen: 'Resumen', causa: 'Causas', suertes: 'Suertes', suerte: 'Suerte ' + arg.split(' ')[0], prueba: 'Prueba del modelo', metodo: 'Método' }[v];
+  const titulo = { resumen: 'Resumen', causa: 'Causas', desarrollo: 'Desarrollo de la caña', suertes: 'Suertes', suerte: 'Suerte ' + arg.split(' ')[0], prueba: 'Prueba del modelo', metodo: 'Método' }[v];
   document.title = `${titulo ? titulo + ' · ' : ''}Caída del TCH Riopaila 2026`;
   if (v === 'causa') vCausa(arg);
+  else if (v === 'desarrollo') vDesarrollo();
   else if (v === 'suertes') vSuertes();
   else if (v === 'suerte') vFicha(arg);
   else if (v === 'prueba') vPrueba();
@@ -727,5 +845,10 @@ window.addEventListener('hashchange', () => ruta());
 
 Promise.all(['resumen', 'causas', 'suertes', 'fichas', 'validacion', 'escenas_bloque3501'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => {
   if (!r.ok) throw new Error(`${n}.json: ${r.status}`); return r.json();
-}))).then(([r, c, s, f, v, e]) => { R = r; C = c; S = s; F = f; V = v; E = e; ruta(); })
+})).concat(fetch('data/desarrollo.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null)))
+  .then(([r, c, s, f, v, e, d]) => {
+    R = r; C = c; S = s; F = f; V = v; E = e; DV = d;
+    if (DV) DV.filas.forEach(x => AFO[x.s + '|' + x.m] = x);
+    ruta();
+  })
   .catch(err => { $app.innerHTML = `<p>No se pudieron cargar los datos (${esc(err.message)}). Recargue la página.</p>`; });

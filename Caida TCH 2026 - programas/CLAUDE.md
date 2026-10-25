@@ -50,7 +50,8 @@ Explicamos con datos medidos por qué cayó el TCH de lo cosechado en Riopaila d
 4. `caida_integrada_rio.py <datos intermedios> <CONTROL DE ROTURACION.xlsm> <Maestro Suertes 2026.xlsx> <soporte_v3.xlsx>` → modelo y aportes; escribe `rio_integrado_dataset.pkl` y `caida_por_suerte.pkl`.
 5. `tablero_datos.py` → `datos intermedios\tablero_v3\suertes_caida_tch.csv` y `pesos_variables.csv`.
 6. `validacion_modelo.py <rio_integrado_dataset.pkl> <suertes_caida_tch.csv> <salida.xlsx> <carpeta csv>`.
-7. `informe_datos.py ... <tablero_web>` → los JSON del informe. Luego publicar.
+7. `informe_datos.py ... <tablero_web>` → los JSON del informe.
+8. `desarrollo_optimo.py <optimo de las variedades.xlsx> <tablero_web\data\suertes.json> <..\Desarrollo_vs_optimo_variedad_2026.xlsx> <tablero_web>` → aforo frente al óptimo de la variedad (Excel + `data/desarrollo.json`: pestaña «Desarrollo de la caña», ficha de cada suerte y causa Corte anterior mecanizado). Luego publicar.
 
 Apoyo: `mecanica_soporte.py` (análisis de la cosecha mecanizada), `mecanica_imagenes.py` (imágenes Sentinel-2 por Earth Engine), `madurante_analisis.py`.
 `mecanizada_satelite.py <datos intermedios> <datos intermedios\satelite_mecanizada> <maestro-riopaila\maestro.csv> [--reusar] [--prueba N]` va antes de `informe_datos.py` (que lo lee si existe). La corrida completa por Earth Engine tarda ~30 min; `--reusar` recalcula con las series e imágenes ya bajadas.
@@ -64,6 +65,8 @@ Apoyo: `mecanica_soporte.py` (análisis de la cosecha mecanizada), `mecanica_ima
 - Nivel freático: Registro de NF de Ingeniería Agrícola, tomado del portal Comité APS (`js/datos.js` publicado; 202 pozos, oct-2020 a sep-2026), en `datos intermedios\freatico_luis\`. Lo formal es que el área comparta su Excel «Registro de NF actualizada.xlsx».
 - Madurante: `04 Presupuesto, inversion y junta\JUNTA DIRECTIVA\Riopaila\Base_Reporte Aplicaciones Agrícola 2019 -2026- Septiembre 14.xlsx`, hoja Madurante (solo lectura; 46 filas con fecha 1970).
 - Satélite: `C:\Users\Agr349\tch-motor\data\gee\mensual_riopaila.csv.gz` (NDVI/NDMI mensual por suerte, Earth Engine).
+- Aforo y óptimo por variedad (25-oct): `Downloads\optimo de las variedades.xlsx` (copia en `Documents`), hoja Matriz (aforo suerte a suerte: columnas BN Altura, BO Población en tallos/m, BP Diámetro; trae nombres de personas, no copiarlos) y hoja Optimo. Falta confirmar de dónde sale el «óptimo» (sus columnas dicen «prom.»: si es un promedio y no un máximo, 95 % está cerca de lo normal). La Matriz parte algunas cosechas en dos filas con el mismo aforo.
+  Resultado: población 93 %, altura 95 %, diámetro 101 %, peso de caña (tallos × altura × diámetro²) 90 % del óptimo. Peso <80 %: −13,3 % de TCH frente a la historia; ≥110 %: +4,8 %. Corte anterior mecanizado frente a manual (misma variedad y zona): peso −7,1 pts la primera vez (p 0,04), −9,2 repetido (p 0,03); altura −8,5 repetido (p 0,02); población −2,4 (p 0,10, débil). No entra en la cascada: es el camino por el que actúan las causas.
 
 ## Decisiones técnicas que no hay que perder
 
