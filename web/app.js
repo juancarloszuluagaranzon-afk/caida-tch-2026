@@ -1073,10 +1073,22 @@ function montarChat() {
     try {
       const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pregunta: q, historial: CHAT.historial.slice(-6), suerte }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.respuesta) throw new Error(j.error || 'No se pudo responder. Intente de nuevo.');
-      espera.innerHTML = textoChat(j.respuesta);
-      CHAT.historial.push({ rol: 'usuario', texto: q }, { rol: 'modelo', texto: j.respuesta });
+      if (!r.ok || (r.headers.get('Content-Type') || '').includes('json')) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || 'No se pudo responder. Intente de nuevo.');
+      }
+      // la respuesta llega por partes: se pinta a medida que llega
+      const lector = r.body.getReader(), dec = new TextDecoder();
+      let texto = '';
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (done) break;
+        texto += dec.decode(value, { stream: true });
+        espera.innerHTML = textoChat(texto);
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+      if (!texto.trim()) throw new Error('No se pudo responder. Intente de nuevo.');
+      CHAT.historial.push({ rol: 'usuario', texto: q }, { rol: 'modelo', texto });
     } catch (err) {
       espera.innerHTML = `<p class="t-q" style="margin:0">${esc(err.message)}</p>`;
     }

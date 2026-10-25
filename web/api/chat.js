@@ -2,12 +2,17 @@
 // (Google AI Studio). Función de Vercel; la llave va en la variable de entorno GEMINI_API_KEY (nunca en la página).
 // Opcional: GEMINI_MODEL (por defecto gemini-flash-latest; si no existe, usa el «flash» más nuevo de la cuenta).
 // POST /api/chat  {pregunta, historial: [{rol: 'usuario'|'modelo', texto}], suerte: clave de la ficha abierta o null}
+// Responde texto plano que llega por partes (se muestra mientras se escribe); los errores, en JSON {error}.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 let MODELO = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 const API = 'https://generativelanguage.googleapis.com/v1beta';
+// razonamiento mínimo: estas preguntas buscan cifras en una tabla y el razonamiento era la mayor parte de la espera.
+// Cada familia de Gemini acepta un ajuste distinto; si uno da 400 se prueba el siguiente (el último: sin ajuste).
+const PENSAR = [{ thinkingLevel: 'minimal' }, { thinkingBudget: 0 }, { thinkingLevel: 'low' }, null];
+let iPensar = 0;
 
 // si el modelo no existe (Google retira y renombra modelos), elige el «flash» más nuevo de los disponibles para la llave
 async function elegirModelo() {
@@ -109,29 +114,57 @@ module.exports = async (req, res) => {
   const contents = hist.filter(h => h && typeof h.texto === 'string')
     .map(h => ({ role: h.rol === 'modelo' ? 'model' : 'user', parts: [{ text: h.texto.slice(0, 4000) }] }));
   contents.push({ role: 'user', parts: [{ text: (suerte ? `(Estoy viendo la ficha de la suerte ${suerte}.) ` : '') + pregunta }] });
+  const sistema = INSTRUCCIONES + (CONTEXTO || armarContexto());
   try {
-    const llamar = () => fetch(`${API}/models/${MODELO}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: INSTRUCCIONES + (CONTEXTO || armarContexto()) }] }, contents,
-        // tope amplio: en los modelos que «piensan», el razonamiento también cuenta contra este tope
-        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 } }),
-    });
+    const llamar = () => {
+      const generationConfig = { temperature: 0.2, maxOutputTokens: 8192 };   // el razonamiento, si lo hay, cuenta contra el tope
+      if (PENSAR[iPensar]) generationConfig.thinkingConfig = PENSAR[iPensar];
+      return fetch(`${API}/models/${MODELO}:streamGenerateContent?alt=sse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: sistema }] }, contents, generationConfig }),
+      });
+    };
     let r = await llamar();
-    if (r.status === 404) {
-      const otro = await elegirModelo();
-      if (otro && otro !== MODELO) { MODELO = otro; r = await llamar(); }
+    for (let intento = 0; !r.ok && intento < PENSAR.length + 1; intento++) {
+      if (r.status === 404) {                       // el modelo ya no existe: el «flash» más nuevo de la cuenta
+        const otro = await elegirModelo();
+        if (!otro || otro === MODELO) break;
+        MODELO = otro; iPensar = 0;
+      } else if (r.status === 400 && iPensar < PENSAR.length - 1) {
+        iPensar++;                                  // este modelo no acepta ese ajuste de razonamiento: probar el siguiente
+      } else break;
+      r = await llamar();
     }
-    const j = await r.json();
     if (!r.ok) {
+      const j = await r.json().catch(() => null);
       const motivo = j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 200) : '';
       return fin(502, { error: `Gemini no respondió (${r.status}${motivo}). Intente de nuevo en un momento.` });
     }
-    const c0 = j.candidates && j.candidates[0];
-    let texto = (c0 && c0.content && c0.content.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
-    if (c0 && c0.finishReason === 'MAX_TOKENS') texto += '\n\n(La respuesta quedó cortada: haga una pregunta más concreta.)';
-    return fin(200, { respuesta: texto || 'No obtuve respuesta. Intente reformular la pregunta.' });
+    // la respuesta llega por partes (SSE de Gemini) y se reenvía a la página como texto a medida que llega
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('X-Accel-Buffering', 'no');
+    const dec = new TextDecoder();
+    let buf = '', algo = false, cortada = false;
+    for await (const trozo of r.body) {
+      buf += dec.decode(trozo, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const linea = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        if (!linea.startsWith('data:')) continue;
+        let ev; try { ev = JSON.parse(linea.slice(5)); } catch (e) { continue; }
+        const c0 = ev.candidates && ev.candidates[0];
+        const t = (c0 && c0.content && c0.content.parts || []).filter(p => !p.thought).map(p => p.text || '').join('');
+        if (t) { res.write(t); algo = true; }
+        if (c0 && c0.finishReason === 'MAX_TOKENS') cortada = true;
+      }
+    }
+    if (!algo) res.write('No obtuve respuesta. Intente reformular la pregunta.');
+    if (cortada) res.write('\n\n(La respuesta quedó cortada: haga una pregunta más concreta.)');
+    return res.end();
   } catch (e) {
+    if (res.headersSent) { res.write('\n\n(Se cortó la conexión con Gemini. Intente de nuevo.)'); return res.end(); }
     return fin(502, { error: 'No se pudo consultar a Gemini. Intente de nuevo en un momento.' });
   }
 };
