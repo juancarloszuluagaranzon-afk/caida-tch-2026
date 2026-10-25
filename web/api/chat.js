@@ -125,7 +125,10 @@ module.exports = async (req, res) => {
         body: JSON.stringify({ systemInstruction: { parts: [{ text: sistema }] }, contents, generationConfig }),
       });
     };
-    let r = await llamar();
+    const t0 = Date.now(), intentos = [];   // diagnóstico: modelo, ajuste de razonamiento y tiempo de cada intento
+    const llamarYAnotar = async () => { const t = Date.now(), x = await llamar();
+      intentos.push({ modelo: MODELO, pensar: PENSAR[iPensar], status: x.status, ms: Date.now() - t }); return x; };
+    let r = await llamarYAnotar();
     for (let intento = 0; !r.ok && intento < PENSAR.length + 1; intento++) {
       if (r.status === 404) {                       // el modelo ya no existe: el «flash» más nuevo de la cuenta
         const otro = await elegirModelo();
@@ -134,8 +137,9 @@ module.exports = async (req, res) => {
       } else if (r.status === 400 && iPensar < PENSAR.length - 1) {
         iPensar++;                                  // este modelo no acepta ese ajuste de razonamiento: probar el siguiente
       } else break;
-      r = await llamar();
+      r = await llamarYAnotar();
     }
+    res.setHeader('X-Chat-Diag', JSON.stringify({ intentos, ms_hasta_gemini: Date.now() - t0 }));
     if (!r.ok) {
       const j = await r.json().catch(() => null);
       const motivo = j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 200) : '';
@@ -146,8 +150,9 @@ module.exports = async (req, res) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('X-Accel-Buffering', 'no');
     const dec = new TextDecoder();
-    let buf = '', algo = false, cortada = false;
+    let buf = '', algo = false, cortada = false, primero = 0;
     for await (const trozo of r.body) {
+      if (!primero) { primero = Date.now() - t0; console.log('chat diag', JSON.stringify({ intentos, ms_primer_trozo: primero })); }
       buf += dec.decode(trozo, { stream: true });
       let i;
       while ((i = buf.indexOf('\n')) >= 0) {
