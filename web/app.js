@@ -833,8 +833,7 @@ function vGerencia() {
       <li><b>Causas.</b> Al tocar una causa salen su gráfica de soporte y la lista de suertes que afectó, con su dato.</li>
       <li><b>Desarrollo de la caña.</b> El aforo de cada suerte frente al óptimo de su variedad.</li>
       <li><b>Suertes y ficha de cada suerte.</b> Cuánto le quitó cada causa y con qué dato, la historia de sus cortes, la lluvia, el calor, el pozo, el satélite y su aforo.</li>
-      <li><b>Prueba del modelo.</b> La validación con datos que el modelo no vio.</li>
-      <li><b>Preguntar.</b> Un chat que responde solo con los datos del informe (puede equivocarse: se verifica en la ficha).</li></ol></section>
+      <li><b>Prueba del modelo.</b> La validación con datos que el modelo no vio.</li></ol></section>
 
     <section><h3>Fuentes y método</h3>
       ${tb(['Dato', 'Fuente', 'Desde'], [
@@ -1033,69 +1032,6 @@ function vMetodo() {
   </div>`;
 }
 
-// ---------------------------------------------------------------- chat: preguntas sobre el informe (api/chat.js, Gemini)
-const CHAT = { historial: [], ocupado: false };
-function textoChat(t) {   // texto simple → HTML: negrita **, viñetas «- » y códigos de suerte con enlace a su ficha
-  return esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-    .replace(/\b(3\d{3}-\d{3})\b/g, (m, c) => { const s = S && S.find(x => x.s === c); return s ? `<a href="${hrefS(s.k)}">${c}</a>` : c; })
-    .split('\n').map(l => /^\s*[-•*]\s+/.test(l) ? `<li>${l.replace(/^\s*[-•*]\s+/, '')}</li>` : l ? `<p>${l}</p>` : '').join('')
-    .replace(/(<li>.*?<\/li>)+/g, m => `<ul>${m}</ul>`);
-}
-function montarChat() {
-  const d = document.createElement('div');
-  d.className = 'chat no-print';
-  d.innerHTML = `<button type="button" class="chat-abrir" aria-expanded="false" aria-controls="chat-panel">Preguntar</button>
-    <section id="chat-panel" class="chat-panel" hidden aria-label="Preguntas sobre el informe">
-      <div class="chat-cab"><b>Pregunte sobre el informe</b><button type="button" class="chat-cerrar" aria-label="Cerrar">×</button></div>
-      <div class="chat-msgs" aria-live="polite"><div class="chat-m modelo"><p>Respondo solo con los datos de este informe: cifras, causas, cada suerte y su aforo.
-        Por ejemplo: «¿Qué suertes de Gertrudis cayeron más y por qué?» o «¿Cuánto pesó la cosecha mecanizada en la zona 1?».</p>
-        <p class="sub" style="margin:0">Puedo equivocarme: verifique en la ficha de la suerte.</p></div></div>
-      <form class="chat-form"><textarea rows="2" maxlength="600" placeholder="Escriba su pregunta" aria-label="Pregunta"></textarea>
-        <button type="submit" class="btn">Enviar</button></form>
-    </section>`;
-  document.body.appendChild(d);
-  const panel = d.querySelector('.chat-panel'), abrir = d.querySelector('.chat-abrir'), msgs = d.querySelector('.chat-msgs');
-  const form = d.querySelector('form'), ta = d.querySelector('textarea');
-  const mostrar = v => { panel.hidden = !v; abrir.hidden = v; abrir.setAttribute('aria-expanded', v); if (v) ta.focus(); };
-  abrir.onclick = () => mostrar(true);
-  d.querySelector('.chat-cerrar').onclick = () => { mostrar(false); abrir.focus(); };
-  const agregar = (rol, html) => { const m = document.createElement('div'); m.className = 'chat-m ' + rol; m.innerHTML = html; msgs.appendChild(m); msgs.scrollTop = msgs.scrollHeight; return m; };
-  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
-  form.onsubmit = async e => {
-    e.preventDefault();
-    const q = ta.value.trim();
-    if (!q || CHAT.ocupado) return;
-    CHAT.ocupado = true; ta.value = '';
-    agregar('usuario', `<p>${esc(q)}</p>`);
-    const espera = agregar('modelo', '<p class="sub" style="margin:0">Buscando en los datos…</p>');
-    const h = decodeURIComponent(location.hash.slice(1));
-    const suerte = h.startsWith('suerte/') ? h.slice(7) : null;
-    try {
-      const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pregunta: q, historial: CHAT.historial.slice(-6), suerte }) });
-      if (!r.ok || (r.headers.get('Content-Type') || '').includes('json')) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error || 'No se pudo responder. Intente de nuevo.');
-      }
-      // la respuesta llega por partes: se pinta a medida que llega
-      const lector = r.body.getReader(), dec = new TextDecoder();
-      let texto = '';
-      for (;;) {
-        const { done, value } = await lector.read();
-        if (done) break;
-        texto += dec.decode(value, { stream: true });
-        espera.innerHTML = textoChat(texto);
-        msgs.scrollTop = msgs.scrollHeight;
-      }
-      if (!texto.trim()) throw new Error('No se pudo responder. Intente de nuevo.');
-      CHAT.historial.push({ rol: 'usuario', texto: q }, { rol: 'modelo', texto });
-    } catch (err) {
-      espera.innerHTML = `<p class="t-q" style="margin:0">${esc(err.message)}</p>`;
-    }
-    CHAT.ocupado = false; msgs.scrollTop = msgs.scrollHeight;
-  };
-}
-
 // ---------------------------------------------------------------- rutas
 function ruta(redibujo) {
   if (!R) return;  // los datos todavía no llegan
@@ -1130,6 +1066,5 @@ Promise.all(['resumen', 'causas', 'suertes', 'fichas', 'validacion', 'escenas_bl
     R = r; C = c; S = s; F = f; V = v; E = e; DV = d;
     if (DV) DV.filas.forEach(x => AFO[x.s + '|' + x.m] = x);
     ruta();
-    montarChat();
   })
   .catch(err => { $app.innerHTML = `<p>No se pudieron cargar los datos (${esc(err.message)}). Recargue la página.</p>`; });
