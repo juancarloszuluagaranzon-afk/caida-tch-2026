@@ -645,6 +645,222 @@ function afoCorte() {
       <a href="#desarrollo">Ver el desarrollo de la caña</a></p></div>`;
 }
 
+// ---------------------------------------------------------------- vista: explicación para la gerencia (documento completo, se descarga en PDF)
+// Las cifras salen de los mismos datos del informe; las de análisis aparte (alerta 2027 en t) se citan del soporte.
+function vGerencia() {
+  const A = agregado(S), P = A.puente, brecha = P.ppto - P.real, sobre = P.ppto - P.hist, caidaP = P.hist - P.real;
+  const top = C.causas.filter(c => Math.abs(c.t_ha) >= 0.3).sort((a, b) => b.t_ha - a.t_ha);
+  const quitan = top.filter(c => c.t_ha > 0), suman = top.filter(c => c.t_ha < 0);
+  const grupos = {};
+  C.causas.forEach(c => grupos[c.grupo] = (grupos[c.grupo] || 0) - c.t_ha);
+  const mec = C.soporte.mecanica, ca = C.soporte['corte-anterior'];
+  const areaMec = y => (mec.anios.find(r => r[0] === y) || [])[1];
+  const brMec = (mec.brecha.find(r => r[0] === 2026) || [])[1];
+  const tablaCA = k => ca.tabla.find(r => r[0] === k) || [];
+  const al = mec.alerta2027, alNdvi = al && al.resumen.find(r => r[0] === 60 && r[1] === 'ndvi');
+  const br20 = mec.brecha.filter(r => r[0] >= 2020 && r[0] <= 2025).map(r => r[1]);
+  const p = prediccion(), causa = id => C.causas.find(c => c.id === id);
+  const minus = t => t[0].toLowerCase() + t.slice(1);   // nombre de la causa dentro de una frase
+  const lista = L => L.map(c => minus(c.nombre)).join(', ').replace(/, ([^,]*)$/, ' y $1');
+  // tabla simple; num = índices de las columnas numéricas
+  const tb = (cab, filas, num = []) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
+    <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const conH = S.filter(s => s.hist != null), haH = conH.reduce((x, s) => x + s.a, 0);
+  const wS = k => { const L = conH.filter(s => s[k] != null), a = L.reduce((x, s) => x + s.a, 0); return a ? L.reduce((x, s) => x + s[k] * s.a, 0) / a : null; };
+  const pArea = f => 100 * conH.filter(f).reduce((x, s) => x + s.a, 0) / haH;
+  const ap = id => sg(-(causa(id) || { t_ha: 0 }).t_ha);
+  // desarrollo de la caña (aforo frente al óptimo de la variedad), si está
+  let des = '', desTablas = '';
+  if (DV) {
+    const rows = S.filter(afo).map(s => ({ s, r: afo(s) }));
+    const pondL = (L, fn) => L.reduce((x, o) => x + fn(o) * o.s.a, 0) / L.reduce((x, o) => x + o.s.a, 0);
+    const pond = fn => pondL(rows, fn);
+    const pr = (k, ant) => DV.pruebas.find(x => x.k === k && x.ant === ant);
+    const rH = rows.filter(o => o.s.hist != null), grupo = (lo, hi) => rH.filter(o => pesoO(o.r) >= lo && pesoO(o.r) < hi);
+    const cambio = L => 100 * (pondL(L, o => o.s.real) / pondL(L, o => o.s.hist) - 1);
+    des = `<p>La caña llegó a la cosecha con ${nf(pond(o => pctO(o.r, 'pob')), 0)} % de la población óptima de su variedad,
+      ${nf(pond(o => pctO(o.r, 'alt')), 0)} % de la altura y ${nf(pond(o => pctO(o.r, 'dia')), 0)} % del diámetro: en peso de caña, ${nf(pond(o => pesoO(o.r)), 0)} % del óptimo
+      (${rows.length} cosechas con aforo). Donde el corte anterior fue mecanizado hubo ${nf(-pr('p_peso', 'mecánica tras manual').dif, 0)} puntos menos de peso de caña la primera vez
+      y ${nf(-pr('p_peso', 'mecánica seguida').dif, 0)} con dos cortes mecanizados seguidos. Las suertes con menos del 80 % del peso óptimo cayeron ${nf(-cambio(grupo(0, 80)), 0)} %
+      frente a su historia; las que llegaron al óptimo o más, subieron ${nf(cambio(grupo(100, 1e9)), 0)} %.</p>`;
+    const G = [['Menos de 80 %', 0, 80], ['80-90 %', 80, 90], ['90-100 %', 90, 100], ['100-110 %', 100, 110], ['110 % o más', 110, 1e9]];
+    const vars = {};
+    rows.forEach(o => (vars[o.r.v] = vars[o.r.v] || []).push(o));
+    const ha = L => L.reduce((x, o) => x + o.s.a, 0);
+    desTablas = `<p style="margin-top:8px"><b>Peso de caña frente al óptimo y cambio del TCH</b></p>
+      ${tb(['Peso de caña', 'Cosechas', 'Área (ha)', 'Historia (TCH)', 'Real (TCH)', 'Cambio'], G.map(([et, lo, hi]) => grupo(lo, hi)).map((L, i) => L.length ? [G[i][0], L.length, nf(ha(L), 0),
+        nf(pondL(L, o => o.s.hist)), nf(pondL(L, o => o.s.real)), `<b class="${clsImp(cambio(L))}">${sg(cambio(L))} %</b>`] : null).filter(Boolean), [1, 2, 3, 4, 5])}
+      <p style="margin-top:8px"><b>Por variedad</b> (las de más área; % del óptimo de cada una)</p>
+      ${tb(['Variedad', 'Cosechas', 'Área (ha)', 'Población', 'Altura', 'Diámetro', 'Peso de caña'],
+        Object.entries(vars).sort((a, b) => ha(b[1]) - ha(a[1])).slice(0, 8).map(([v, L]) => [esc(v), L.length, nf(ha(L), 0),
+          ...['pob', 'alt', 'dia'].map(k => { const x = pondL(L, o => pctO(o.r, k)); return `<span class="${clsO(x)}">${nf(x, 0)} %</span>`; }),
+          `<b class="${clsO(pondL(L, o => pesoO(o.r)))}">${nf(pondL(L, o => pesoO(o.r)), 0)} %</b>`]), [1, 2, 3, 4, 5, 6])}`;
+  }
+  // clima, agua y nivel freático: 2026 frente a lo normal de cada suerte en su mes (ponderado por área)
+  const chA = C.soporte['corte-humedo'];
+  const hum2425 = chA ? (chA.anios.filter(r => r[0] === 2024 || r[0] === 2025).reduce((x, r) => x + r[1], 0) / 2) : null;
+  const clima = [
+    ['Días con más de 32 °C en los 30 días antes del corte', nf(wS('d32')), nf(wS('d32n')), ap('calor')],
+    ['Déficit de agua sin riego al final del ciclo (mm)', nf(wS('dsr'), 0), nf(wS('dsrn'), 0), ap('sequia')],
+    ['Riego aplicado al final del ciclo (mm)', nf(wS('rie'), 0), nf(wS('rien'), 0), ap('riego')],
+    ['Lluvia de los meses 0-3 del ciclo (mm)', nf(wS('llu'), 0), nf(wS('llun'), 0), ap('lluvia')],
+    ['Nivel freático promedio del ciclo (m)', nf(wS('nf'), 2), nf(wS('nfn'), 2), ap('freatico')],
+    ['Lluvia en el mes del corte anterior (mm)', chA ? nf(chA.mm[0], 0) : '—', chA ? nf(chA.mm[1], 0) : '—', ap('corte-humedo')]];
+  const co = C.soporte.corte, ed = C.soporte.edad, va = C.soporte.variedades;
+  // validación por grupos
+  const segs = V.segmentos.filter(r => (r[0] === 'Cosecha' || r[0] === 'Zona') && r[1] !== 'nan' && r[1] !== 'sin dato');
+  // lo que queda sin explicar suerte por suerte
+  const expl = s => C.causas.reduce((x, c) => x + (s.ap[c.id] || 0), 0);
+  const masSE = conH.filter(s => s.se != null && Math.abs(s.se) > Math.abs(expl(s))).length;
+  const peor = [...conH].sort((a, b) => (b.hist - b.real) - (a.hist - a.real))[0];
+  $app.innerHTML = `<article class="doc pila">
+    <div class="no-print doc-acciones"><button type="button" class="btn" id="g-pdf">Descargar PDF</button>
+      <span class="sub" style="margin:0">Abre la ventana de impresión: elija «Guardar como PDF».</span></div>
+    <header class="doc-cab"><h2>Caída del TCH Riopaila 2026: qué pasó y por qué</h2>
+      <p class="sub">Cosechas de ${R.periodo} · explicación para la gerencia · cifras vigentes del informe en línea</p></header>
+
+    <p class="doc-lead">El TCH de lo cosechado de ${R.periodo} cayó <b>${nf(R.caida)} TCH (${sg(R.caida_pct)} %, ${nf(R.t_caida, 0)} t)</b> frente a lo que esas mismas suertes
+      daban en 2020-25. Lo explican sobre todo ${lista(quitan.slice(0, 3))}.
+      Todo está calculado con datos medidos y estadística propia, sin calificaciones subjetivas.</p>
+
+    <section><h3>En cifras</h3>
+      <div class="tabla"><table><tbody>
+        <tr><td>Histórico 2020-25 de las mismas suertes</td><td class="n"><b>${nf(R.hist)}</b> TCH</td></tr>
+        <tr><td>Presupuesto 2026 (Maestro de Suertes)</td><td class="n"><b>${nf(P.ppto)}</b> TCH</td></tr>
+        <tr><td>Real 2026</td><td class="n"><b>${nf(R.real)}</b> TCH</td></tr>
+        <tr><td>Toneladas perdidas frente al histórico</td><td class="n"><b class="t-q">${nf(R.t_caida, 0)}</b> t · ${sg(-R.caida)} TCH</td></tr>
+        <tr><td>Toneladas perdidas frente al presupuesto</td><td class="n"><b class="t-q">${nf(P.t, 0)}</b> t · ${sg(P.real - P.ppto)} TCH</td></tr>
+      </tbody></table></div>
+      <p class="sub" style="margin:6px 0 0">${R.cosechas} cosechas con historia (${nf(R.ha, 0)} ha) de las ${R.cosechas_total} del periodo. Contra el presupuesto, las ${P.cosechas} que tienen PPTO.</p></section>
+
+    <section><h3>Contra el presupuesto, la mayor parte no es caída</h3>
+      <p>De los ${nf(brecha)} TCH de brecha contra el presupuesto, <b>${nf(sobre)} TCH (${nf(100 * sobre / brecha, 0)} %)</b> son presupuesto por encima de lo que esas suertes
+        dieron en 2020-25: ninguna causa de campo lo explica, es cómo se armó el presupuesto. Solo <b>${nf(caidaP)} TCH (${nf(100 * caidaP / brecha, 0)} %)</b> son caída real.</p></section>
+
+    <section><h3>Por qué cayó</h3>
+      ${divergentes(top.map(c => ({ et: c.nombre, v: -c.t_ha })).concat([{ et: 'Sin explicar', v: -R.sin_explicar, color: 'var(--hist)' }]))}
+      <p style="margin-top:8px">Por tipo de causa: ${Object.entries(grupos).sort((a, b) => a[1] - b[1]).map(([g, v]) => `<b>${g.toLowerCase()}</b> ${sg(v)} TCH`).join(' · ')}.
+        ${suman.length ? `Sumaron ${lista(suman)}: en 2026 hubo más de lo que ayuda o menos de lo que resta.` : ''}
+        Las causas suman ${sg(-(R.caida - R.sin_explicar))} TCH frente a ${sg(-R.caida)} que cayó.</p></section>
+
+    <section><h3>Qué se midió en cada causa</h3>
+      <p>Cada causa es un dato medido en campo, en estaciones o por satélite, y su peso sale de 7.433 cosechas de Riopaila de 2011 a 2026, comparando cada suerte
+        consigo misma. Ninguna causa usa una nota o calificación puesta a mano. El aporte de una causa = su efecto × (nivel de 2026 − nivel normal).</p>
+      ${tb(['Causa', 'Qué se midió', 'Cuánto pesa', 'Aporte 2026 (TCH)'],
+        [...C.causas].sort((a, b) => b.t_ha - a.t_ha).map(c => [`<b>${esc(c.nombre)}</b><br><span class="sub">${esc(c.grupo)}</span>`, esc(c.mide), esc(c.efecto),
+          `<b class="${clsImp(-c.t_ha)}">${sg(-c.t_ha)}</b>`]), [3])}
+      <p class="sub" style="margin:6px 0 0">Normal = promedio 2020-25 en los mismos meses de cosecha; para agua y nivel freático, 2022-25 (años con registro); para labores, 2024-25.</p></section>
+
+    <section><h3>Cosecha mecanizada: la causa más grande que depende de nosotros</h3>
+      <p>La cosechadora daña la cepa y genera despoblación. El área con cosecha mecanizada pasó de ${nf(areaMec(2023), 0)} % en 2023 a <b>${nf(areaMec(2026), 0)} % en 2026</b>,
+        y en 2026 una suerte cosechada a máquina dio ${nf(-brMec, 1)} % menos que a mano (entre 2020 y 2025 la diferencia iba de ${sg(Math.max(...br20))} a ${sg(Math.min(...br20))} %).
+        La soca también lo paga: las suertes que venían de un corte mecanizado cayeron ${nf(-tablaCA('mecánica tras manual')[3], 0)} % (primera vez)
+        y ${nf(-tablaCA('mecánica seguida')[3], 0)} % (dos seguidos) frente a su historia, contra ${nf(-tablaCA('manual')[3], 0)} % las de corte manual.</p>
+      ${tb(['Año', ...mec.anios.filter(r => r[0] >= 2019).map(r => r[0])], [['Área con cosecha mecanizada', ...mec.anios.filter(r => r[0] >= 2019).map(r => nf(r[1], 0) + ' %')],
+        ['TCH mecanizada frente a manual', ...mec.anios.filter(r => r[0] >= 2019).map(r => { const b = mec.brecha.find(x => x[0] === r[0]); return b ? sg(b[1]) + ' %' : '—'; })]],
+        mec.anios.filter(r => r[0] >= 2019).map((_, i) => i + 1))}
+      <p style="margin-top:10px"><b>La cepa que deja el corte anterior.</b> ${esc(causa('corte-anterior').efecto)}</p>
+      ${tb(['Cómo fue el corte anterior', 'Cosechas 2026', 'Área (ha)', 'Cambio del TCH frente a su historia'],
+        ca.tabla.map(r => [esc(ANT[r[0]] || r[0]), r[1], nf(r[2], 0), `<b class="${clsImp(r[3])}">${sg(r[3])} %</b>`]), [1, 2, 3])}
+      <p style="margin-top:10px"><b>El satélite lo ve.</b> Después del primer corte mecanizado la soca arranca con menos humedad en el follaje y más rebrote ralo.
+        En el bloque 3501 de la hacienda Riopaila (suertes 3501-550, 551, 560 y 561), cosechado a mano en julio de 2024 y mecanizado en julio de 2025 y de 2026,
+        se ve a simple vista: después del corte mecanizado la soca sale más clara y con franjas a lo largo de los surcos, por donde pasan la cosechadora y los vagones.
+        En toda la cosecha 2026 se comparó la soca de cada suerte a la misma edad después del corte manual y después del primer mecanizado, frente a suertes con
+        dos cortes manuales seguidos: a los 2 meses la humedad del follaje empeoró más (señal clara); a los 5 meses ya no se diferenciaba.
+        El satélite ve el golpe en el arranque; lo que se pierde en toneladas lo mide la báscula.</p>
+      ${al ? `<p><b>Alerta 2027.</b> ${al.n} suertes tuvieron en 2026 su primera cosecha mecanizada.${alNdvi ? ` A los 2 meses, su vigor (NDVI) bajó ${nf(-alNdvi[6], 2)} más que en las de corte manual (señal clara)` : ''};
+        con el efecto medido del corte anterior mecanizado, darían en 2027 unas 1.800 t menos, sin contar lo que pierdan si se vuelven a cosechar con máquina.
+        Parte de la señal temprana puede ser hojarasca: es una alerta para revisar en campo, no un pronóstico. La lista suerte por suerte, con sus imágenes,
+        está en el informe en línea, en la causa «Cosecha mecanizada».</p>` : ''}</section>
+
+    ${DV ? `<section><h3>Desarrollo de la caña: el aforo frente al óptimo de cada variedad</h3>
+      <p>El aforo mide la caña en pie antes de la cosecha: tallos por metro (población), altura y diámetro. Comparado con el óptimo de su variedad, muestra cuánta caña
+        había para cosechar. Como se mide antes del corte de 2026, la población que encuentra la dejó el corte anterior.</p>
+      ${des}${desTablas}
+      <p class="sub" style="margin:6px 0 0">No es una causa más: es el camino por el que actúan el calor, la sequía o la cosecha mecanizada, por eso no se suma en las causas.
+        El óptimo sale de la tabla de óptimos por variedad (columnas de promedio); falta confirmar si es un promedio o un máximo alcanzable.</p></section>` : ''}
+
+    <section><h3>Clima, agua y nivel freático</h3>
+      <p>Entre calor y sequía, el clima de 2026 quitó ${sg(-(causa('calor').t_ha + causa('sequia').t_ha))} TCH; el riego devolvió ${ap('riego')}.
+        Cada suerte se compara con lo normal de su mes de cosecha.</p>
+      ${tb(['Variable', '2026', 'Normal', 'Aporte (TCH)'], clima.map(r => [r[0], `<b>${r[1]}</b>`, r[2], `<b class="${clsImp(parseFloat(String(r[3]).replace('−', '-').replace(',', '.')))}">${r[3]}</b>`]), [1, 2, 3])}
+      <p style="margin-top:10px"><b>Calor y sequía no son lo mismo.</b> El calor cuenta los días con más de 32 °C en los 30 días antes del corte: la caña transpira y respira más,
+        pierde agua y peso, y no se compensa. La sequía cuenta el agua que faltó (evaporación menos lluvia) del mes 8 del ciclo a la cosecha: con poca agua la caña llena
+        menos el tallo, y el riego lo compensa en parte. Las dos entran juntas en el modelo, así que un mes caliente y seco no se cuenta dos veces.
+        Algo de estrés de agua al final se busca a propósito para madurar la caña; en 2026 el déficit fue mucho mayor que lo normal y eso ya resta.</p>
+      <p><b>Nivel freático.</b> Medido en los 202 pozos del Registro de NF de Ingeniería Agrícola (lecturas cada 15 días), llevado a cada suerte. En promedio fue parecido
+        a lo normal, pero el ${nf(pArea(s => s.nf != null && s.nf < 1), 0)} % del área cosechada tuvo el agua a menos de 1 m y ahí sí resta.</p>
+      <p><b>Cosecha con suelo húmedo.</b> El ${nf(chA ? (chA.anios.find(r => r[0] === 2026) || [])[1] : pArea(s => s.mmca != null && s.mmca >= 100), 0)} % del área cosechada en 2026 venía de un corte hecho en un mes con 100 mm de lluvia
+        o más${hum2425 != null ? `, contra ${nf(hum2425, 0)} % en 2024-25` : ''}. ${esc(causa('corte-humedo').efecto)}
+        Roturar o fertilizar con el suelo húmedo (lluvia en los 5 días antes) se probó y no mostró un efecto confiable.</p></section>
+
+    <section><h3>Número de corte, edad de cosecha y variedades</h3>
+      ${co ? `<p><b>Cada corte resta, pero en 2026 se cosecharon socas más jóvenes.</b> Frente a la plantilla, en la misma suerte: ${co.efecto.map(r => `${r[0]} ${sg(r[1])} %`).join(', ')}.
+        En 2026 el corte promedio fue ${nf(co.prom[0])} contra ${nf(co.prom[1])} normal, por eso este factor sumó ${ap('corte')} TCH.</p>
+      ${tb(['Corte', ...co.mezcla.map(r => r[0])], [['Área 2026', ...co.mezcla.map(r => nf(r[1], 0) + ' %')], ['Normal', ...co.mezcla.map(r => nf(r[2], 0) + ' %')]], co.mezcla.map((_, i) => i + 1))}` : ''}
+      ${ed ? `<p style="margin-top:10px"><b>Edad de cosecha (${ap('edad')} TCH).</b> En 2026 se cortó con ${nf(ed.prom[0])} meses en promedio, contra ${nf(ed.prom[1])} normal:
+        el ${nf((ed.e.find(r => r[0] === '12-13') || [0, 0])[1], 0)} % del área se cortó entre 12 y 13 meses (normal ${nf((ed.e.find(r => r[0] === '12-13') || [0, 0, 0])[2], 0)} %). Cortar con más edad da más toneladas.</p>` : ''}
+      ${va ? `<p style="margin-top:10px"><b>Variedades (${ap('variedades')} TCH).</b> Cambió la mezcla de variedades cosechadas: ${va.v.slice(0, 4).map(r => `${r[0]} ${nf(r[1], 0)} % del área (normal ${nf(r[2], 0)} %)`).join(', ')}.</p>` : ''}</section>
+
+    <section><h3>Qué tan seguro es</h3>
+      <p>Ajustado solo con 2011-2025, sin ver 2026, el modelo predijo el <b>${nf(p.pct, 0)} %</b> de la caída, y año por año desde 2013 se movió con lo real
+        (correlación ${nf(V.corr, 2)}). Un modelo que solo se acomoda a los datos no predice nada fuera de ellos. Señala bien dónde cayó más, pero se queda corto en el tamaño:
+        el resto es un golpe común del año que ninguna variable medida captura.</p>
+      ${tb(['Grupo (sin ver 2026)', 'Cosechas', 'Pasó', 'Predijo'], segs.map(r => [r[1].startsWith(r[0]) ? esc(r[1]) : `${esc(r[0])}: ${esc(r[1])}`, r[2], `<span class="${clsImp(r[3])}">${sg(r[3])} %</span>`, `${sg(r[4])} %`]), [1, 2, 3])}
+      <p style="margin-top:10px">${tb(['Año', ...V.anual.slice(-7).map(r => r[0])], [['Pasó', ...V.anual.slice(-7).map(r => sg(r[1]) + ' %')], ['Predijo sin ver el año', ...V.anual.slice(-7).map(r => sg(r[2]) + ' %')]],
+        V.anual.slice(-7).map((_, i) => i + 1))}</p>
+      <p class="sub" style="margin:6px 0 0">Cambio de cada año frente a los 6 años anteriores, predicho con un modelo que no vio ese año.</p></section>
+
+    <section><h3>Lo que el modelo no explica</h3>
+      <ul style="margin:0;padding-left:20px">
+        <li><b>Suerte por suerte queda mucho sin explicar.</b> Entre suertes explica una parte de las diferencias (R² ${V.r2.map(r => nf(r[1], 2)).join(' a ')}).
+          En ${masSE} de las ${conH.length} cosechas lo «sin explicar» pesa más que todas las causas medidas juntas.
+          ${peor ? `La que más cayó, la ${esc(peor.s)} (${esc(peor.h)}), perdió ${nf(peor.hist - peor.real)} TCH frente a su historia: las variables medidas explican ${nf(expl(peor))} TCH
+          y quedan ${nf(peor.se || 0)} TCH sin explicar.` : ''} Cada ficha del informe en línea lo muestra así, sin esconderlo.</li>
+        <li><b>Las cifras de cada causa son efectos promedio</b> medidos en 7.433 cosechas, no un diagnóstico de campo de cada suerte.</li>
+        <li><b>Falta medir el madurante</b> (dosis en cc por tonelada frente al presupuesto) y confirmar de dónde sale el óptimo de cada variedad.</li>
+        <li><b>Lo que no medimos</b> (plagas, compactación, condiciones de la cosecha) cae dentro de lo «sin explicar».</li></ul></section>
+
+    <section><h3>Qué proponemos</h3><ol style="margin:0;padding-left:20px">
+      <li><b>Revisar la cosecha mecanizada:</b> el daño a la cepa, sobre todo donde se repite el corte mecanizado, y evitar cortar con el suelo húmedo. Revisar en campo,
+        antes de la cosecha 2027, las suertes de la alerta que rebrotaron peor.</li>
+      <li><b>Armar el presupuesto 2027 desde el histórico de cada suerte</b>, ajustado por tipo de cosecha y edad.</li>
+      <li><b>Seguir la caída mes a mes</b> con el mismo modelo y la misma prueba; medir el madurante y el desarrollo de la caña con el aforo de cada mes.</li>
+      <li><b>Conectar el Registro de NF</b> como fuente fija para el nivel freático.</li></ol></section>
+
+    <section><h3>Cómo recorrer el informe en línea</h3><ol style="margin:0;padding-left:20px">
+      <li><b>Resumen.</b> Histórico, presupuesto y real; las causas y el puente al presupuesto, con filtros por hacienda, zona, zona agroecológica, variedad, tipo de cosecha y mes.</li>
+      <li><b>Causas.</b> Al tocar una causa salen su gráfica de soporte y la lista de suertes que afectó, con su dato.</li>
+      <li><b>Desarrollo de la caña.</b> El aforo de cada suerte frente al óptimo de su variedad.</li>
+      <li><b>Suertes y ficha de cada suerte.</b> Cuánto le quitó cada causa y con qué dato, la historia de sus cortes, la lluvia, el calor, el pozo, el satélite y su aforo.</li>
+      <li><b>Prueba del modelo.</b> La validación con datos que el modelo no vio.</li>
+      <li><b>Preguntar.</b> Un chat que responde solo con los datos del informe (puede equivocarse: se verifica en la ficha).</li></ol></section>
+
+    <section><h3>Fuentes y método</h3>
+      ${tb(['Dato', 'Fuente', 'Desde'], [
+        ['TCH, tipo de cosecha, corte, edad, variedad', 'ZQM histórico y G&amp;P Suertes 2026', '2011'],
+        ['Corte anterior mecanizado', 'Corte anterior de la misma suerte en el ZQM', '2012'],
+        ['Calor y lluvia', 'EMA La Paila y Bugalagrande, Meteoportal de Cenicaña y pluviómetros de Riopaila', '2011'],
+        ['Déficit de agua y riego', 'Histórico de riego por suerte y evaporación de las EMA', '2022'],
+        ['Nivel freático', 'Registro de NF de Ingeniería Agrícola, 202 pozos', 'oct-2020'],
+        ['Roturación, herbicida, fertilización', 'Control de roturación, bases de aplicaciones y SimpleAgri', '2024'],
+        ['NDVI y NDMI', 'Sentinel-2 por Earth Engine, promedio mensual por suerte', '2019'],
+        ['Aforo (población, altura, diámetro)', 'Aforo suerte a suerte y tabla de óptimos por variedad', '2026'],
+        ['PPTO, zona, hacienda y fecha de corte', 'Maestro de Suertes 2026 (TCH PPTO, columna AG)', '2026']], [2])}
+      <p style="margin-top:8px">El modelo es una regresión del TCH (en logaritmo) sobre 7.433 cosechas de Riopaila de 2011 a 2026, ponderada por área, con un nivel propio para
+        cada suerte, cada año y cada mes de cosecha, y un efecto para cada variable medida. El aporte de una causa en una suerte es su efecto por la diferencia entre el nivel
+        de 2026 y el normal; los aportes más lo «sin explicar» suman exacto la caída.</p></section>
+
+    <p class="sub doc-pie">El detalle de cada causa y de cada suerte está en el informe en línea: <a href="https://caida-tch-yy76h1.vercel.app">caida-tch-yy76h1.vercel.app</a>.</p>
+  </article>`;
+  document.getElementById('g-pdf').onclick = () => {
+    const t = document.title;
+    document.title = 'Caida TCH Riopaila 2026 - explicacion para la gerencia';   // nombre del PDF
+    window.print();
+    document.title = t;
+  };
+}
+
 // ---------------------------------------------------------------- vista: suertes
 function vSuertes() {
   $app.innerHTML = `<div class="pila"><div><h2>Suertes cosechadas en 2026</h2>
@@ -817,6 +1033,57 @@ function vMetodo() {
   </div>`;
 }
 
+// ---------------------------------------------------------------- chat: preguntas sobre el informe (api/chat.js, Gemini)
+const CHAT = { historial: [], ocupado: false };
+function textoChat(t) {   // texto simple → HTML: negrita **, viñetas «- » y códigos de suerte con enlace a su ficha
+  return esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/\b(3\d{3}-\d{3})\b/g, (m, c) => { const s = S && S.find(x => x.s === c); return s ? `<a href="${hrefS(s.k)}">${c}</a>` : c; })
+    .split('\n').map(l => /^\s*[-•*]\s+/.test(l) ? `<li>${l.replace(/^\s*[-•*]\s+/, '')}</li>` : l ? `<p>${l}</p>` : '').join('')
+    .replace(/(<li>.*?<\/li>)+/g, m => `<ul>${m}</ul>`);
+}
+function montarChat() {
+  const d = document.createElement('div');
+  d.className = 'chat no-print';
+  d.innerHTML = `<button type="button" class="chat-abrir" aria-expanded="false" aria-controls="chat-panel">Preguntar</button>
+    <section id="chat-panel" class="chat-panel" hidden aria-label="Preguntas sobre el informe">
+      <div class="chat-cab"><b>Pregunte sobre el informe</b><button type="button" class="chat-cerrar" aria-label="Cerrar">×</button></div>
+      <div class="chat-msgs" aria-live="polite"><div class="chat-m modelo"><p>Respondo solo con los datos de este informe: cifras, causas, cada suerte y su aforo.
+        Por ejemplo: «¿Qué suertes de Gertrudis cayeron más y por qué?» o «¿Cuánto pesó la cosecha mecanizada en la zona 1?».</p>
+        <p class="sub" style="margin:0">Puedo equivocarme: verifique en la ficha de la suerte.</p></div></div>
+      <form class="chat-form"><textarea rows="2" maxlength="600" placeholder="Escriba su pregunta" aria-label="Pregunta"></textarea>
+        <button type="submit" class="btn">Enviar</button></form>
+    </section>`;
+  document.body.appendChild(d);
+  const panel = d.querySelector('.chat-panel'), abrir = d.querySelector('.chat-abrir'), msgs = d.querySelector('.chat-msgs');
+  const form = d.querySelector('form'), ta = d.querySelector('textarea');
+  const mostrar = v => { panel.hidden = !v; abrir.hidden = v; abrir.setAttribute('aria-expanded', v); if (v) ta.focus(); };
+  abrir.onclick = () => mostrar(true);
+  d.querySelector('.chat-cerrar').onclick = () => { mostrar(false); abrir.focus(); };
+  const agregar = (rol, html) => { const m = document.createElement('div'); m.className = 'chat-m ' + rol; m.innerHTML = html; msgs.appendChild(m); msgs.scrollTop = msgs.scrollHeight; return m; };
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const q = ta.value.trim();
+    if (!q || CHAT.ocupado) return;
+    CHAT.ocupado = true; ta.value = '';
+    agregar('usuario', `<p>${esc(q)}</p>`);
+    const espera = agregar('modelo', '<p class="sub" style="margin:0">Buscando en los datos…</p>');
+    const h = decodeURIComponent(location.hash.slice(1));
+    const suerte = h.startsWith('suerte/') ? h.slice(7) : null;
+    try {
+      const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pregunta: q, historial: CHAT.historial.slice(-6), suerte }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.respuesta) throw new Error(j.error || 'No se pudo responder. Intente de nuevo.');
+      espera.innerHTML = textoChat(j.respuesta);
+      CHAT.historial.push({ rol: 'usuario', texto: q }, { rol: 'modelo', texto: j.respuesta });
+    } catch (err) {
+      espera.innerHTML = `<p class="t-q" style="margin:0">${esc(err.message)}</p>`;
+    }
+    CHAT.ocupado = false; msgs.scrollTop = msgs.scrollHeight;
+  };
+}
+
 // ---------------------------------------------------------------- rutas
 function ruta(redibujo) {
   if (!R) return;  // los datos todavía no llegan
@@ -826,9 +1093,10 @@ function ruta(redibujo) {
     const on = a.dataset.v === v || (a.dataset.v === 'suertes' && v === 'suerte');
     on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
   });
-  const titulo = { resumen: 'Resumen', causa: 'Causas', desarrollo: 'Desarrollo de la caña', suertes: 'Suertes', suerte: 'Suerte ' + arg.split(' ')[0], prueba: 'Prueba del modelo', metodo: 'Método' }[v];
+  const titulo = { resumen: 'Resumen', gerencia: 'Para la gerencia', causa: 'Causas', desarrollo: 'Desarrollo de la caña', suertes: 'Suertes', suerte: 'Suerte ' + arg.split(' ')[0], prueba: 'Prueba del modelo', metodo: 'Método' }[v];
   document.title = `${titulo ? titulo + ' · ' : ''}Caída del TCH Riopaila 2026`;
   if (v === 'causa') vCausa(arg);
+  else if (v === 'gerencia') vGerencia();
   else if (v === 'desarrollo') vDesarrollo();
   else if (v === 'suertes') vSuertes();
   else if (v === 'suerte') vFicha(arg);
@@ -850,5 +1118,6 @@ Promise.all(['resumen', 'causas', 'suertes', 'fichas', 'validacion', 'escenas_bl
     R = r; C = c; S = s; F = f; V = v; E = e; DV = d;
     if (DV) DV.filas.forEach(x => AFO[x.s + '|' + x.m] = x);
     ruta();
+    montarChat();
   })
   .catch(err => { $app.innerHTML = `<p>No se pudieron cargar los datos (${esc(err.message)}). Recargue la página.</p>`; });
