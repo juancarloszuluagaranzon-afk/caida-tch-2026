@@ -69,6 +69,11 @@ q["clave"] = x.clave
 S = S.set_index("clave").loc[q.clave].reset_index()
 S.index = q.index
 ref = ds[ds.anio.between(2020, 2025) & ds.Mes.between(1, 9)]
+# el informe da los efectos en TCH: % del modelo × un TCH base (el % queda entre paréntesis)
+TN = float(np.average(ref.tch_calc, weights=ref.Area))   # TCH normal 2020-25 de Riopaila, enero a septiembre
+TMAN = {y: float(np.average(g.tch_calc, weights=g.Area)) for y, g in ds[ds.mec == 0].groupby("anio")}   # TCH manual de cada año
+TPL0 = float(np.average(ref.tch_calc[ref.Corte == 1], weights=ref.Area[ref.Corte == 1]))   # TCH de las plantillas 2020-25
+tc = lambda pct, base=None, d=1: f"{es(pct / 100 * (base or TN), d)} TCH ({es(pct, d if d > 1 else 1)} %)"  # noqa: E731
 ds["prev_tch"] = ds.sort_values(["ste", "cosecha"]).groupby("ste").tch_calc.shift()
 q["prev_tch"] = ds.loc[q.index, "prev_tch"]
 
@@ -97,34 +102,36 @@ N_NF = normal_mes("nf_ciclo", ref_nf)
 CAUSAS = [
     {"id": "mecanica", "nombre": "Cosecha mecanizada", "col": "Cosecha mecanizada", "grupo": "Agronómico y operativo",
      "mide": "Si la cosecha de 2026 fue mecanizada: la cosechadora daña la cepa y genera despoblación.",
-     "efecto": f"En 2026 la cosecha mecanizada rindió {es(coef.loc['mec_2026', 'efecto %'])} % de TCH frente a la manual en la misma "
-               f"suerte (en 2020-25 la diferencia fue de −2 a −4 %)."},
+     "efecto": f"En 2026 la cosecha mecanizada rindió {tc(coef.loc['mec_2026', 'efecto %'], TMAN[2026])} frente a la manual en la misma "
+               f"suerte (en 2020-25 la diferencia fue de "
+               f"{es(max(coef.loc[f'mec_{y}', 'efecto %'] / 100 * TMAN[y] for y in range(2020, 2026)))} a "
+               f"{es(min(coef.loc[f'mec_{y}', 'efecto %'] / 100 * TMAN[y] for y in range(2020, 2026)))} TCH)."},
     {"id": "corte-anterior", "nombre": "Corte anterior mecanizado", "col": "Corte anterior mecanizado", "grupo": "Agronómico y operativo",
      "mide": "Si el corte que dejó esta soca fue mecanizado: la cepa queda aporreada y rebrota menos.",
-     "efecto": f"Soca que sale de un corte mecanizado después de manual: {es(coef.loc['pm_new', 'efecto %'])} % de TCH; de dos "
-               f"cortes mecanizados seguidos: {es(coef.loc['pm_seg', 'efecto %'])} % (2011-2026)."},
+     "efecto": f"Soca que sale de un corte mecanizado después de manual: {tc(coef.loc['pm_new', 'efecto %'])}; de dos "
+               f"cortes mecanizados seguidos: {tc(coef.loc['pm_seg', 'efecto %'])} (2011-2026)."},
     {"id": "corte-humedo", "nombre": "Cosecha con suelo húmedo", "col": "Corte anterior en suelo húmedo",
      "grupo": "No controlable",
      "mide": "Lluvia en el mes del corte anterior en la estación de la suerte. Si el corte se hizo con el suelo húmedo, la "
              "cepa queda más golpeada y la soca rebrota menos; se toma como húmedo un mes con 100 mm o más.",
-     "efecto": f"Por cada 100 mm de lluvia en el mes del corte anterior: {es(coef.loc['ca_mm100', 'efecto %'])} % de TCH "
+     "efecto": f"Por cada 100 mm de lluvia en el mes del corte anterior: {tc(coef.loc['ca_mm100', 'efecto %'])} "
                f"({ep(coef.loc['ca_mm100', 'p'])}). La diferencia entre corte manual y mecanizado no fue confiable."},
     {"id": "calor", "nombre": "Temperatura mayor a 32 °C 30 días antes de cosecha", "col": "Días Tmax >32 °C", "grupo": "No controlable",
      "mide": "Días con temperatura máxima por encima de 32 °C en los 30 días antes del corte (EMA La Paila o Bugalagrande).",
-     "efecto": f"Cada día por encima de 32 °C: {es(coef.loc['d32', 'efecto %'], 2)} % de TCH."},
+     "efecto": f"Cada día por encima de 32 °C: {tc(coef.loc['d32', 'efecto %'], d=2)}."},
     {"id": "sequia", "nombre": "Sequía al final del ciclo", "col": "Balance hídrico: sequía al final", "grupo": "No controlable",
      "mide": "Balance hídrico de los últimos meses del ciclo: evaporación menos lluvia (déficit sin riego, mm).",
-     "efecto": f"Cada 100 mm de déficit que queda después del riego: {es(coef.loc['def100', 'efecto %'])} % de TCH."},
+     "efecto": f"Cada 100 mm de déficit que queda después del riego: {tc(coef.loc['def100', 'efecto %'])}."},
     {"id": "riego", "nombre": "Riego aplicado", "col": "Balance hídrico: riego aplicado", "grupo": "Flujo de caja",
      "mide": "Lámina de riego aplicada al final del ciclo (mm), que reduce el déficit.",
-     "efecto": f"Cada 100 mm de riego evitan {es(-coef.loc['def100', 'efecto %'])[1:]} % de pérdida de TCH (mismo coeficiente del déficit)."},
+     "efecto": f"Cada 100 mm de riego evitan perder {es(-coef.loc['def100', 'efecto %'] / 100 * TN)[1:]} TCH ({es(-coef.loc['def100', 'efecto %'])[1:]} %; mismo coeficiente del déficit)."},
     {"id": "freatico", "nombre": "Nivel freático", "col": "Nivel freático", "grupo": "No controlable",
      "mide": "Nivel promedio del agua freática en la suerte entre el corte anterior y la cosecha (pozos del Registro de NF, "
              "interpolados a la suerte).",
-     "efecto": f"Por cada 10 cm que el nivel promedio estuvo por encima de 1,5 m: {es(coef.loc['nf_exc15', 'efecto %'] / 10, 2)} % de TCH."},
+     "efecto": f"Por cada 10 cm que el nivel promedio estuvo por encima de 1,5 m: {tc(coef.loc['nf_exc15', 'efecto %'] / 10, d=2)}."},
     {"id": "lluvia", "nombre": "Lluvia del arranque", "col": "Precipitación 0 a 3 meses", "grupo": "No controlable",
      "mide": "Lluvia de los primeros 3 meses del ciclo (EMA), cuando rebrota la soca.",
-     "efecto": f"Cada 100 mm de más en los meses 0-3: {es(coef.loc['llu03_100', 'efecto %'])} % de TCH."},
+     "efecto": f"Cada 100 mm de más en los meses 0-3: {tc(coef.loc['llu03_100', 'efecto %'])}."},
     {"id": "variedades", "nombre": "Variedades", "col": "Variedades", "grupo": "Agronómico y operativo",
      "mide": "La variedad sembrada, frente a la mezcla de variedades de 2020-25.",
      "efecto": "Cada variedad tiene su propio efecto, medido en la misma suerte a lo largo de los años."},
@@ -133,28 +140,29 @@ CAUSAS = [
      "efecto": "Cortar más viejo da más toneladas: 2026 se cortó con más edad y eso sumó."},
     {"id": "renovacion", "nombre": "Renovación no hecha", "col": "No renovación", "grupo": "Flujo de caja",
      "mide": "Suertes del plan de renovación 2025 que siguieron como soca.",
-     "efecto": f"Suerte que debía renovarse y no se renovó: {es(coef.loc['no_renov', 'efecto %'])} % de TCH (poco seguro, {ep(coef.loc['no_renov', 'p'])})."},
+     "efecto": f"Suerte que debía renovarse y no se renovó: {tc(coef.loc['no_renov', 'efecto %'])} (poco seguro, {ep(coef.loc['no_renov', 'p'])})."},
     {"id": "roturacion", "nombre": "Oportunidad de roturación", "col": "Oportunidad roturación", "grupo": "Flujo de caja",
      "mide": "Roturación fuera de oportunidad (control de roturación; si no está, SimpleAgri).",
-     "efecto": f"Roturación tardía: {es(coef.loc['rot_tard', 'efecto %'])} % de TCH ({ep(coef.loc['rot_tard', 'p'])}). "
+     "efecto": f"Roturación tardía: {tc(coef.loc['rot_tard', 'efecto %'])} ({ep(coef.loc['rot_tard', 'p'])}). "
                f"Roturar con el suelo húmedo (lluvia en los 5 días antes) no mostró efecto confiable: "
-               f"{es(PROB.loc['Roturación en suelo húmedo', 'efecto %'])} % por cada 10 mm ({ep(PROB.loc['Roturación en suelo húmedo', 'p'])})."},
+               f"{tc(PROB.loc['Roturación en suelo húmedo', 'efecto %'])} por cada 10 mm ({ep(PROB.loc['Roturación en suelo húmedo', 'p'])})."},
     {"id": "malezas", "nombre": "Control de malezas", "col": "Control de malezas", "grupo": "Flujo de caja",
      "mide": "Días del corte al primer herbicida; cuenta el atraso después de 90 días.",
-     "efecto": f"Por mes de atraso después de 90 días: {es(coef.loc['mal_extra30', 'efecto %'])} % de TCH ({ep(coef.loc['mal_extra30', 'p'])})."},
+     "efecto": f"Por mes de atraso después de 90 días: {tc(coef.loc['mal_extra30', 'efecto %'])} ({ep(coef.loc['mal_extra30', 'p'])})."},
     {"id": "fertilizacion", "nombre": "Oportunidad de fertilización", "col": "Oportunidad fertilización", "grupo": "Flujo de caja",
      "mide": "Días del corte a la fertilización; cuenta si pasó de 120 días.",
-     "efecto": f"Fertilización después de 120 días: {es(coef.loc['fert_120', 'efecto %'])} % de TCH ({ep(coef.loc['fert_120', 'p'])}). "
+     "efecto": f"Fertilización después de 120 días: {tc(coef.loc['fert_120', 'efecto %'])} ({ep(coef.loc['fert_120', 'p'])}). "
                f"Fertilizar con el suelo húmedo no mostró efecto confiable: "
-               f"{es(PROB.loc['Fertilización en suelo húmedo', 'efecto %'])} % por cada 10 mm ({ep(PROB.loc['Fertilización en suelo húmedo', 'p'])})."},
+               f"{tc(PROB.loc['Fertilización en suelo húmedo', 'efecto %'])} por cada 10 mm ({ep(PROB.loc['Fertilización en suelo húmedo', 'p'])})."},
     {"id": "corte", "nombre": "Número de corte (socas más jóvenes en 2026)", "col": "N° de corte", "grupo": "Agronómico y operativo",
      "mide": "Cuántos cortes lleva la soca, frente a la historia 2020-25 de la misma suerte. Cada corte le quita productividad a la "
              "soca; en 2026 se cosecharon socas más jóvenes que lo normal (más segundos cortes y menos de 6 o más), por eso este "
              "factor sumó.",
      "efecto": "Frente a la plantilla, en la misma suerte: " + ", ".join(
-         f"{r.corte.replace(' o más', '')} corte{' o más' if 'más' in r.corte else ''} {es(r.efecto_pct)} %" for r in pd.read_pickle(PK / "efecto_corte.pkl")["efecto"].itertuples()) + "."},
+         f"{r.corte.replace(' o más', '')} corte{' o más' if 'más' in r.corte else ''} {tc(r.efecto_pct, TPL0)}" for r in pd.read_pickle(PK / "efecto_corte.pkl")["efecto"].itertuples()) +
+         f" (en TCH, sobre el TCH promedio de las plantillas 2020-25: {es(TPL0)[1:]})."},
     {"id": "incendio", "nombre": "Incendio", "col": "Incendio", "grupo": "Agronómico y operativo",
-     "mide": "Cosecha forzada por incendio.", "efecto": f"Cosecha por incendio: {es(coef.loc['inc', 'efecto %'])} % de TCH."},
+     "mide": "Cosecha forzada por incendio.", "efecto": f"Cosecha por incendio: {tc(coef.loc['inc', 'efecto %'])}."},
 ]
 ok = S.tch_hist.notna()
 w = S.area[ok]
@@ -411,7 +419,7 @@ sop["corte"] = {"efecto": [[r.corte, r1(r.efecto_pct), r1(r.efecto_pct / 100 * T
                 "mezcla": [[k, r1(100 * v["2026"]), r1(100 * v["normal"]), r1(HAQ * v["2026"], 0), r1(HAQ * v["normal"], 0)]
                            for k, v in EC["mezcla"].iterrows()],
                 "prom": [r1(EC["corte_2026"]), r1(EC["corte_normal"])]}
-guardar({"causas": CAUSAS, "soporte": sop}, "causas.json")
+guardar({"causas": CAUSAS, "soporte": sop, "tch_base": r1(TN)}, "causas.json")   # TCH con que se llevan los % a TCH
 
 # ---------------------------------------------------------------- resumen y validación
 pp = S[S.ppto.notna() & ok]

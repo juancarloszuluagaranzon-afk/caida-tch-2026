@@ -509,6 +509,7 @@ function vCausa(id) {
         <div class="cifra num ${clsImp(-c.t_ha)}">${sg(-c.t_ha, 2)} TCH <span style="font-size:15px;font-weight:400;color:var(--muted)">en promedio · ${sg(-c.t_ha * R.ha, 0)} t en ${nf(R.ha, 0)} ha</span></div>
         <p style="margin:10px 0 4px"><b>Qué mide.</b> ${esc(c.mide)}</p>
         <p style="margin:0"><b>Cuánto pesa.</b> ${esc(c.efecto)} Medido en 7.433 cosechas de 2011 a 2026, cada suerte frente a sí misma.</p>
+        ${C.tch_base ? `<p class="sub" style="margin:4px 0 0">El efecto del modelo es un %; en TCH se calcula sobre el TCH normal 2020-25 de Riopaila (${nf(C.tch_base)} TCH), salvo que el texto diga otra base.</p>` : ''}
         <p class="sub" style="margin:8px 0 0">Le quitó más de 0,5 TCH a ${nAf} cosechas y le sumó más de 0,5 TCH a ${nFa}.</p></div>
       <div class="caja" id="soporte"></div>
       <div class="caja"><div class="cab"><h3 style="margin:0">Suertes y su dato</h3>
@@ -662,21 +663,23 @@ function vGerencia() {
   const grupos = {};
   C.causas.forEach(c => grupos[c.grupo] = (grupos[c.grupo] || 0) - c.t_ha);
   const mec = C.soporte.mecanica, ca = C.soporte['corte-anterior'];
-  const areaMec = y => (mec.anios.find(r => r[0] === y) || [])[1];
-  const brMec = (mec.brecha.find(r => r[0] === 2026) || [])[1];
   const tablaCA = k => ca.tabla.find(r => r[0] === k) || [];
   const al = mec.alerta2027, alNdvi = al && al.resumen.find(r => r[0] === 60 && r[1] === 'ndvi');
-  const br20 = mec.brecha.filter(r => r[0] >= 2020 && r[0] <= 2025).map(r => r[1]);
   const p = prediccion(), causa = id => C.causas.find(c => c.id === id);
   const minus = t => t[0].toLowerCase() + t.slice(1);   // nombre de la causa dentro de una frase
   const lista = L => L.map(c => minus(c.nombre)).join(', ').replace(/, ([^,]*)$/, ' y $1');
   // tabla simple; num = índices de las columnas numéricas
   const tb = (cab, filas, num = []) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
     <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const conH = S.filter(s => s.hist != null), haH = conH.reduce((x, s) => x + s.a, 0);
+  const conH = S.filter(s => s.hist != null);
   const wS = k => { const L = conH.filter(s => s[k] != null), a = L.reduce((x, s) => x + s.a, 0); return a ? L.reduce((x, s) => x + s[k] * s.a, 0) / a : null; };
-  const pArea = f => 100 * conH.filter(f).reduce((x, s) => x + s.a, 0) / haH;
   const ap = id => sg(-(causa(id) || { t_ha: 0 }).t_ha);
+  const haMec = y => (mec.ha.find(r => r[0] === y) || [])[1], haTot = y => (mec.ha.find(r => r[0] === y) || [])[2];
+  const brT = y => (mec.brecha_tch.find(r => r[0] === y) || [])[1];
+  const br20T = mec.brecha_tch.filter(r => r[0] >= 2020 && r[0] <= 2025).map(r => r[1]);
+  const haArea = f => conH.filter(f).reduce((x, s) => x + s.a, 0);
+  const histSeg = r => { const L = conH.filter(s => r[0] === 'Cosecha' ? s.tipo === r[1] : r[0] === 'Zona' ? 'Zona ' + s.z === r[1] : true),
+    a = L.reduce((x, s) => x + s.a, 0); return a ? L.reduce((x, s) => x + s.hist * s.a, 0) / a : R.hist; };   // % de la validación → TCH
   // desarrollo de la caña (aforo frente al óptimo de la variedad), si está
   let des = '', desTablas = '';
   if (DV) {
@@ -685,19 +688,19 @@ function vGerencia() {
     const pond = fn => pondL(rows, fn);
     const pr = (k, ant) => DV.pruebas.find(x => x.k === k && x.ant === ant);
     const rH = rows.filter(o => o.s.hist != null), grupo = (lo, hi) => rH.filter(o => pesoO(o.r) >= lo && pesoO(o.r) < hi);
-    const cambio = L => 100 * (pondL(L, o => o.s.real) / pondL(L, o => o.s.hist) - 1);
+    const cambio = L => pondL(L, o => o.s.real) - pondL(L, o => o.s.hist);   // TCH frente a la historia
     des = `<p>La caña llegó a la cosecha con ${nf(pond(o => pctO(o.r, 'pob')), 0)} % de la población óptima de su variedad,
       ${nf(pond(o => pctO(o.r, 'alt')), 0)} % de la altura y ${nf(pond(o => pctO(o.r, 'dia')), 0)} % del diámetro: en peso de caña, ${nf(pond(o => pesoO(o.r)), 0)} % del óptimo
       (${rows.length} cosechas con aforo). Donde el corte anterior fue mecanizado hubo ${nf(-pr('p_peso', 'mecánica tras manual').dif, 0)} puntos menos de peso de caña la primera vez
-      y ${nf(-pr('p_peso', 'mecánica seguida').dif, 0)} con dos cortes mecanizados seguidos. Las suertes con menos del 80 % del peso óptimo cayeron ${nf(-cambio(grupo(0, 80)), 0)} %
-      frente a su historia; las que llegaron al óptimo o más, subieron ${nf(cambio(grupo(100, 1e9)), 0)} %.</p>`;
+      y ${nf(-pr('p_peso', 'mecánica seguida').dif, 0)} con dos cortes mecanizados seguidos. Las suertes con menos del 80 % del peso óptimo cayeron ${nf(-cambio(grupo(0, 80)))} TCH
+      frente a su historia; las que llegaron al óptimo o más, subieron ${nf(cambio(grupo(100, 1e9)))} TCH.</p>`;
     const G = [['Menos de 80 %', 0, 80], ['80-90 %', 80, 90], ['90-100 %', 90, 100], ['100-110 %', 100, 110], ['110 % o más', 110, 1e9]];
     const vars = {};
     rows.forEach(o => (vars[o.r.v] = vars[o.r.v] || []).push(o));
     const ha = L => L.reduce((x, o) => x + o.s.a, 0);
     desTablas = `<p style="margin-top:8px"><b>Peso de caña frente al óptimo y cambio del TCH</b></p>
       ${tb(['Peso de caña', 'Cosechas', 'Área (ha)', 'Historia (TCH)', 'Real (TCH)', 'Cambio'], G.map(([et, lo, hi]) => grupo(lo, hi)).map((L, i) => L.length ? [G[i][0], L.length, nf(ha(L), 0),
-        nf(pondL(L, o => o.s.hist)), nf(pondL(L, o => o.s.real)), `<b class="${clsImp(cambio(L))}">${sg(cambio(L))} %</b>`] : null).filter(Boolean), [1, 2, 3, 4, 5])}
+        nf(pondL(L, o => o.s.hist)), nf(pondL(L, o => o.s.real)), `<b class="${clsImp(cambio(L))}">${sg(cambio(L))} TCH</b>`] : null).filter(Boolean), [1, 2, 3, 4, 5])}
       <p style="margin-top:8px"><b>Por variedad</b> (las de más área; % del óptimo de cada una)</p>
       ${tb(['Variedad', 'Cosechas', 'Área (ha)', 'Población', 'Altura', 'Diámetro', 'Peso de caña'],
         Object.entries(vars).sort((a, b) => ha(b[1]) - ha(a[1])).slice(0, 8).map(([v, L]) => [esc(v), L.length, nf(ha(L), 0),
@@ -706,7 +709,7 @@ function vGerencia() {
   }
   // clima, agua y nivel freático: 2026 frente a lo normal de cada suerte en su mes (ponderado por área)
   const chA = C.soporte['corte-humedo'];
-  const hum2425 = chA ? (chA.anios.filter(r => r[0] === 2024 || r[0] === 2025).reduce((x, r) => x + r[1], 0) / 2) : null;
+  const humHa2425 = chA && chA.ha ? (chA.ha.filter(r => r[0] === 2024 || r[0] === 2025).reduce((x, r) => x + r[1], 0) / 2) : null;
   const clima = [
     ['Días con más de 32 °C en los 30 días antes del corte', nf(wS('d32')), nf(wS('d32n')), ap('calor')],
     ['Déficit de agua sin riego al final del ciclo (mm)', nf(wS('dsr'), 0), nf(wS('dsrn'), 0), ap('sequia')],
@@ -727,7 +730,7 @@ function vGerencia() {
     <header class="doc-cab"><h2>Caída del TCH Riopaila 2026: qué pasó y por qué</h2>
       <p class="sub">Cosechas de ${R.periodo} · explicación para la gerencia · cifras vigentes del informe en línea</p></header>
 
-    <p class="doc-lead">El TCH de lo cosechado de ${R.periodo} cayó <b>${nf(R.caida)} TCH (${sg(R.caida_pct)} %, ${nf(R.t_caida, 0)} t)</b> frente a lo que esas mismas suertes
+    <p class="doc-lead">El TCH de lo cosechado de ${R.periodo} cayó <b>${nf(R.caida)} TCH (${nf(R.t_caida, 0)} t)</b> frente a lo que esas mismas suertes
       daban en 2020-25. Lo explican sobre todo ${lista(quitan.slice(0, 3))}.
       Todo está calculado con datos medidos y estadística propia, sin calificaciones subjetivas.</p>
 
@@ -760,16 +763,16 @@ function vGerencia() {
       <p class="sub" style="margin:6px 0 0">Normal = promedio 2020-25 en los mismos meses de cosecha; para agua y nivel freático, 2022-25 (años con registro); para labores, 2024-25.</p></section>
 
     <section><h3>Cosecha mecanizada: la causa más grande que depende de nosotros</h3>
-      <p>La cosechadora daña la cepa y genera despoblación. El área con cosecha mecanizada pasó de ${nf(areaMec(2023), 0)} % en 2023 a <b>${nf(areaMec(2026), 0)} % en 2026</b>,
-        y en 2026 una suerte cosechada a máquina dio ${nf(-brMec, 1)} % menos que a mano (entre 2020 y 2025 la diferencia iba de ${sg(Math.max(...br20))} a ${sg(Math.min(...br20))} %).
-        La soca también lo paga: las suertes que venían de un corte mecanizado cayeron ${nf(-tablaCA('mecánica tras manual')[3], 0)} % (primera vez)
-        y ${nf(-tablaCA('mecánica seguida')[3], 0)} % (dos seguidos) frente a su historia, contra ${nf(-tablaCA('manual')[3], 0)} % las de corte manual.</p>
-      ${tb(['Año', ...mec.anios.filter(r => r[0] >= 2019).map(r => r[0])], [['Área con cosecha mecanizada', ...mec.anios.filter(r => r[0] >= 2019).map(r => nf(r[1], 0) + ' %')],
-        ['TCH mecanizada frente a manual', ...mec.anios.filter(r => r[0] >= 2019).map(r => { const b = mec.brecha.find(x => x[0] === r[0]); return b ? sg(b[1]) + ' %' : '—'; })]],
+      <p>La cosechadora daña la cepa y genera despoblación. El área con cosecha mecanizada pasó de ${nf(haMec(2023), 0)} ha en 2023 a <b>${nf(haMec(2026), 0)} ha en 2026</b> (de enero a septiembre, de ${nf(haTot(2026), 0)} ha cosechadas),
+        y en 2026 una suerte cosechada a máquina dio ${nf(-brT(2026))} TCH menos que a mano (entre 2020 y 2025 la diferencia iba de ${sg(Math.max(...br20T))} a ${sg(Math.min(...br20T))} TCH).
+        La soca también lo paga: las suertes que venían de un corte mecanizado cayeron ${nf(-tablaCA('mecánica tras manual')[4])} TCH (primera vez)
+        y ${nf(-tablaCA('mecánica seguida')[4])} TCH (dos seguidos) frente a su historia, contra ${nf(-tablaCA('manual')[4])} TCH las de corte manual.</p>
+      ${tb(['Año', ...mec.anios.filter(r => r[0] >= 2019).map(r => r[0])], [['Área con cosecha mecanizada (ha)', ...mec.anios.filter(r => r[0] >= 2019).map(r => nf(haMec(r[0]), 0))],
+        ['Mecanizada frente a manual (TCH)', ...mec.anios.filter(r => r[0] >= 2019).map(r => brT(r[0]) == null ? '—' : sg(brT(r[0])))]],
         mec.anios.filter(r => r[0] >= 2019).map((_, i) => i + 1))}
       <p style="margin-top:10px"><b>La cepa que deja el corte anterior.</b> ${esc(causa('corte-anterior').efecto)}</p>
-      ${tb(['Cómo fue el corte anterior', 'Cosechas 2026', 'Área (ha)', 'Cambio del TCH frente a su historia'],
-        ca.tabla.map(r => [esc(ANT[r[0]] || r[0]), r[1], nf(r[2], 0), `<b class="${clsImp(r[3])}">${sg(r[3])} %</b>`]), [1, 2, 3])}
+      ${tb(['Cómo fue el corte anterior', 'Cosechas 2026', 'Área (ha)', 'Cambio del TCH frente a su historia (TCH)'],
+        ca.tabla.map(r => [esc(ANT[r[0]] || r[0]), r[1], nf(r[2], 0), `<b class="${clsImp(r[4])}">${sg(r[4])}</b>`]), [1, 2, 3])}
       <p style="margin-top:10px"><b>El satélite lo ve.</b> Después del primer corte mecanizado la soca arranca con menos humedad en el follaje y más rebrote ralo.
         En el bloque 3501 de la hacienda Riopaila (suertes 3501-550, 551, 560 y 561), cosechado a mano en julio de 2024 y mecanizado en julio de 2025 y de 2026,
         se ve a simple vista: después del corte mecanizado la soca sale más clara y con franjas a lo largo de los surcos, por donde pasan la cosechadora y los vagones.
@@ -797,25 +800,25 @@ function vGerencia() {
         menos el tallo, y el riego lo compensa en parte. Las dos entran juntas en el modelo, así que un mes caliente y seco no se cuenta dos veces.
         Algo de estrés de agua al final se busca a propósito para madurar la caña; en 2026 el déficit fue mucho mayor que lo normal y eso ya resta.</p>
       <p><b>Nivel freático.</b> Medido en los 202 pozos del Registro de NF de Ingeniería Agrícola (lecturas cada 15 días), llevado a cada suerte. En promedio fue parecido
-        a lo normal, pero el ${nf(pArea(s => s.nf != null && s.nf < 1), 0)} % del área cosechada tuvo el agua a menos de 1 m y ahí sí resta.</p>
-      <p><b>Cosecha con suelo húmedo.</b> El ${nf(chA ? (chA.anios.find(r => r[0] === 2026) || [])[1] : pArea(s => s.mmca != null && s.mmca >= 100), 0)} % del área cosechada en 2026 venía de un corte hecho en un mes con 100 mm de lluvia
-        o más${hum2425 != null ? `, contra ${nf(hum2425, 0)} % en 2024-25` : ''}. ${esc(causa('corte-humedo').efecto)}
+        a lo normal, pero ${nf(haArea(s => s.nf != null && s.nf < 1), 0)} ha cosechadas tuvieron el agua a menos de 1 m y ahí sí resta.</p>
+      <p><b>Cosecha con suelo húmedo.</b> ${nf(chA && chA.ha ? (chA.ha.find(r => r[0] === 2026) || [])[1] : haArea(s => s.mmca != null && s.mmca >= 100), 0)} ha cosechadas en 2026 venían de un corte hecho en un mes con 100 mm de lluvia
+        o más${humHa2425 != null ? `, contra ${nf(humHa2425, 0)} ha por año en 2024-25 (años completos)` : ''}. ${esc(causa('corte-humedo').efecto)}
         Roturar o fertilizar con el suelo húmedo (lluvia en los 5 días antes) se probó y no mostró un efecto confiable.</p></section>
 
     <section><h3>Número de corte, edad de cosecha y variedades</h3>
-      ${co ? `<p><b>Cada corte resta, pero en 2026 se cosecharon socas más jóvenes.</b> Frente a la plantilla, en la misma suerte: ${co.efecto.map(r => `${r[0]} ${sg(r[1])} %`).join(', ')}.
+      ${co ? `<p><b>Cada corte resta, pero en 2026 se cosecharon socas más jóvenes.</b> Frente a la plantilla, en la misma suerte: ${co.efecto.map(r => `${r[0]} ${sg(r[2])} TCH`).join(', ')} (sobre el TCH de las plantillas 2020-25, ${nf(co.plantilla_tch)}).
         En 2026 el corte promedio fue ${nf(co.prom[0])} contra ${nf(co.prom[1])} normal, por eso este factor sumó ${ap('corte')} TCH.</p>
-      ${tb(['Corte', ...co.mezcla.map(r => r[0])], [['Área 2026', ...co.mezcla.map(r => nf(r[1], 0) + ' %')], ['Normal', ...co.mezcla.map(r => nf(r[2], 0) + ' %')]], co.mezcla.map((_, i) => i + 1))}` : ''}
+      ${tb(['Corte', ...co.mezcla.map(r => r[0])], [['Área 2026 (ha)', ...co.mezcla.map(r => nf(r[3], 0))], ['Normal (ha)', ...co.mezcla.map(r => nf(r[4], 0))]], co.mezcla.map((_, i) => i + 1))}` : ''}
       ${ed ? `<p style="margin-top:10px"><b>Edad de cosecha (${ap('edad')} TCH).</b> En 2026 se cortó con ${nf(ed.prom[0])} meses en promedio, contra ${nf(ed.prom[1])} normal:
-        el ${nf((ed.e.find(r => r[0] === '12-13') || [0, 0])[1], 0)} % del área se cortó entre 12 y 13 meses (normal ${nf((ed.e.find(r => r[0] === '12-13') || [0, 0, 0])[2], 0)} %). Cortar con más edad da más toneladas.</p>` : ''}
-      ${va ? `<p style="margin-top:10px"><b>Variedades (${ap('variedades')} TCH).</b> Cambió la mezcla de variedades cosechadas: ${va.v.slice(0, 4).map(r => `${r[0]} ${nf(r[1], 0)} % del área (normal ${nf(r[2], 0)} %)`).join(', ')}.</p>` : ''}</section>
+        ${nf((ed.e.find(r => r[0] === '12-13') || [])[3], 0)} ha se cortaron entre 12 y 13 meses (normal ${nf((ed.e.find(r => r[0] === '12-13') || [])[4], 0)} ha). Cortar con más edad da más toneladas.</p>` : ''}
+      ${va ? `<p style="margin-top:10px"><b>Variedades (${ap('variedades')} TCH).</b> Cambió la mezcla de variedades cosechadas: ${va.v.slice(0, 4).map(r => `${r[0]} ${nf(r[3], 0)} ha (normal ${nf(r[4], 0)} ha)`).join(', ')}.</p>` : ''}</section>
 
     <section><h3>Qué tan seguro es</h3>
       <p>Ajustado solo con 2011-2025, sin ver 2026, el modelo predijo el <b>${nf(p.pct, 0)} %</b> de la caída, y año por año desde 2013 se movió con lo real
         (correlación ${nf(V.corr, 2)}). Un modelo que solo se acomoda a los datos no predice nada fuera de ellos. Señala bien dónde cayó más, pero se queda corto en el tamaño:
         el resto es un golpe común del año que ninguna variable medida captura.</p>
-      ${tb(['Grupo (sin ver 2026)', 'Cosechas', 'Pasó', 'Predijo'], segs.map(r => [r[1].startsWith(r[0]) ? esc(r[1]) : `${esc(r[0])}: ${esc(r[1])}`, r[2], `<span class="${clsImp(r[3])}">${sg(r[3])} %</span>`, `${sg(r[4])} %`]), [1, 2, 3])}
-      <p style="margin-top:10px">${tb(['Año', ...V.anual.slice(-7).map(r => r[0])], [['Pasó', ...V.anual.slice(-7).map(r => sg(r[1]) + ' %')], ['Predijo sin ver el año', ...V.anual.slice(-7).map(r => sg(r[2]) + ' %')]],
+      ${tb(['Grupo (sin ver 2026)', 'Cosechas', 'Pasó', 'Predijo'], segs.map(r => { const h = histSeg(r); return [r[1].startsWith(r[0]) ? esc(r[1]) : `${esc(r[0])}: ${esc(r[1])}`, r[2], `<span class="${clsImp(r[3])}">${sg(r[3] / 100 * h)} TCH</span>`, `${sg(r[4] / 100 * h)} TCH`]; }), [1, 2, 3])}
+      <p style="margin-top:10px">${tb(['Año', ...V.anual.slice(-7).map(r => r[0])], [['Pasó (%)', ...V.anual.slice(-7).map(r => sg(r[1]) + ' %')], ['Predijo sin ver el año (%)', ...V.anual.slice(-7).map(r => sg(r[2]) + ' %')]],
         V.anual.slice(-7).map((_, i) => i + 1))}</p>
       <p class="sub" style="margin:6px 0 0">Cambio de cada año frente a los 6 años anteriores, predicho con un modelo que no vio ese año.</p></section>
 
