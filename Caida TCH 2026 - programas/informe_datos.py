@@ -321,13 +321,19 @@ print(f"fichas.json: {len(fichas)} · {(DATA / 'fichas.json').stat().st_size / 1
 
 # ---------------------------------------------------------------- soporte de cada causa (gráficas del informe)
 sop = {}
-a = ds.groupby("anio").apply(lambda g: pd.Series({"pct": 100 * (g.Area * g.mec).sum() / g.Area.sum()}))
+# el informe muestra área en ha y efectos en TCH; los % quedan como dato secundario
+a = ds.groupby("anio").apply(lambda g: pd.Series({"pct": 100 * (g.Area * g.mec).sum() / g.Area.sum(), "ha": g.Area.sum(),
+                                                  "ha_mec": (g.Area * g.mec).sum(), "tch_man": wm(g[g.mec == 0], "tch_calc")}))
 sop["mecanica"] = {"anios": [[int(y), r1(v.pct)] for y, v in a.iterrows()],
-                   "brecha": [[y, r1(coef.loc[f"mec_{y}", "efecto %"])] for y in range(2020, 2027)]}
+                   "ha": [[int(y), r1(v.ha_mec, 0), r1(v.ha, 0)] for y, v in a.iterrows()],   # [año, ha mecanizadas, ha cosechadas]
+                   "brecha": [[y, r1(coef.loc[f"mec_{y}", "efecto %"])] for y in range(2020, 2027)],
+                   # el efecto en TCH: % de la misma suerte × TCH promedio de la cosecha manual de ese año
+                   "brecha_tch": [[y, r1(coef.loc[f"mec_{y}", "efecto %"] / 100 * a.loc[y, "tch_man"])] for y in range(2020, 2027)]}
 hist_s = ds[ds.anio.between(2015, 2025)].groupby("ste").apply(lambda g: wm(g, "tch_calc"))
 qq = q.assign(h=q.ste.map(hist_s)).dropna(subset=["h"])
 ORD = ["manual", "mecánica tras manual", "mecánica seguida", "plantilla o sin dato"]
-sop["corte-anterior"] = {"tabla": [[k, int(len(g)), r1(g.Area.sum(), 0), r1(100 * (wm(g, "tch_calc") / wm(g, "h") - 1))]
+sop["corte-anterior"] = {"tabla": [[k, int(len(g)), r1(g.Area.sum(), 0), r1(100 * (wm(g, "tch_calc") / wm(g, "h") - 1)),
+                                    r1(wm(g, "tch_calc") - wm(g, "h"))]   # [.., cambio %, cambio en TCH]
                                    for k in ORD if len(g := qq[qq.ant == k])]}
 # satélite: diferencia de NDVI y NDMI por mes de edad (efectos fijos de suerte y del mes observado)
 cur = []
@@ -373,8 +379,8 @@ for cid, col, refd in (("calor", "d32", ref), ("lluvia", "llu03", ref), ("sequia
 area_s = ds.drop_duplicates("ste", keep="last").set_index("ste").Area
 NF["ha"] = NF.ste.map(area_s)
 tl = NF.dropna(subset=["ha"]).groupby("fecha").apply(lambda g: pd.Series({
-    "lt1": 100 * g.ha[g.nivel < 1].sum() / g.ha.sum(), "prom": np.average(g.nivel, weights=g.ha)}))
-sop["freatico"]["tiempo"] = [[f.date().isoformat(), r1(v.lt1), r1(v.prom, 2)] for f, v in tl.iterrows()]
+    "lt1": 100 * g.ha[g.nivel < 1].sum() / g.ha.sum(), "prom": np.average(g.nivel, weights=g.ha), "ha_lt1": g.ha[g.nivel < 1].sum()}))
+sop["freatico"]["tiempo"] = [[f.date().isoformat(), r1(v.lt1), r1(v.prom, 2), r1(v.ha_lt1, 0)] for f, v in tl.iterrows()]
 # lluvia mensual de la EMA La Paila frente a lo normal (2025-2026)
 sop["lluvia"]["ema"] = [[f.strftime("%Y-%m"), r1(LLM["La Paila"].get(f), 0), r1(NLL["La Paila"].get(f.month), 0)]
                         for f in pd.date_range("2024-07-01", "2026-09-01", freq="MS")]
@@ -382,20 +388,28 @@ sop["calor"]["ema"] = [[f.strftime("%Y-%m"), r1(CAL["La Paila"].get(f), 0), r1(N
                        for f in pd.date_range("2024-07-01", "2026-09-01", freq="MS")]
 s26 = q.groupby("var").Area.sum() / q.Area.sum()
 sR = ref.groupby("var").Area.sum() / ref.Area.sum()
-sop["variedades"] = {"v": [[v, r1(100 * s26.get(v, 0)), r1(100 * sR.get(v, 0))] for v in (s26 + sR).fillna(0).sort_values(ascending=False).index[:9]]}
+# área en ha: 2026 tal cual; «normal» = la mezcla de 2020-25 llevada al área cosechada en 2026 (mismo total, se compara la mezcla)
+HAQ = float(q.Area.sum())
+sop["variedades"] = {"v": [[v, r1(100 * s26.get(v, 0)), r1(100 * sR.get(v, 0)), r1(HAQ * s26.get(v, 0), 0), r1(HAQ * sR.get(v, 0), 0)]
+                           for v in (s26 + sR).fillna(0).sort_values(ascending=False).index[:9]]}
 EDS = ["<9", "9-10", "10-11", "11-12", "12-13", "13-14", "14-15", ">15"]
 e26 = q.groupby("edad_b").Area.sum() / q.Area.sum()
 eR = ref.groupby("edad_b").Area.sum() / ref.Area.sum()
-sop["edad"] = {"e": [[k, r1(100 * e26.get(k, 0)), r1(100 * eR.get(k, 0))] for k in EDS],
+sop["edad"] = {"e": [[k, r1(100 * e26.get(k, 0)), r1(100 * eR.get(k, 0)), r1(HAQ * e26.get(k, 0), 0), r1(HAQ * eR.get(k, 0), 0)] for k in EDS],
                "prom": [r1(wm(q, "Edad")), r1(wm(ref, "Edad"))]}
 okh = ds.mm_ca.notna() & (ds.p_na == 0) & ds.anio.between(2012, 2026)
 hh = ds[okh].assign(h=(ds.mm_ca >= 100).astype(float)).groupby("anio").apply(lambda g: 100 * wm(g, "h"))
+hha = ds[okh].assign(h=(ds.mm_ca >= 100).astype(float)).groupby("anio").apply(lambda g: (g.Area * g.h).sum())
 sop["corte-humedo"] = {"anios": [[int(y), r1(v)] for y, v in hh.items()],
+                       "ha": [[int(y), r1(v, 0)] for y, v in hha.items()],   # ha cuyo corte anterior fue con suelo húmedo
                        "mm": [r1(wm(q[q.mm_ca.notna() & (q.p_na == 0)], "mm_ca"), 0),
                               r1(wm(ref[ref.mm_ca.notna() & (ref.p_na == 0)], "mm_ca"), 0)]}
 EC = pd.read_pickle(PK / "efecto_corte.pkl")  # de caida_integrada_rio.py
-sop["corte"] = {"efecto": [[r.corte, r1(r.efecto_pct)] for r in EC["efecto"].itertuples()],
-                "mezcla": [[k, r1(100 * v["2026"]), r1(100 * v["normal"])] for k, v in EC["mezcla"].iterrows()],
+TPL = wm(ref[ref.Corte == 1], "tch_calc")   # TCH promedio de las plantillas 2020-25: lleva el % de cada corte a TCH
+sop["corte"] = {"efecto": [[r.corte, r1(r.efecto_pct), r1(r.efecto_pct / 100 * TPL)] for r in EC["efecto"].itertuples()],
+                "plantilla_tch": r1(TPL),
+                "mezcla": [[k, r1(100 * v["2026"]), r1(100 * v["normal"]), r1(HAQ * v["2026"], 0), r1(HAQ * v["normal"], 0)]
+                           for k, v in EC["mezcla"].iterrows()],
                 "prom": [r1(EC["corte_2026"]), r1(EC["corte_normal"])]}
 guardar({"causas": CAUSAS, "soporte": sop}, "causas.json")
 

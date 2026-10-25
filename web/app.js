@@ -365,16 +365,17 @@ function soporte(id, el) {
   const leyMes = leyenda([['var(--quita)', '2026'], ['var(--hist)', 'Normal 2020-25, mismo mes']]);
   let html = '', specs = [];
   if (id === 'mecanica') {
-    html = caja('Área con cosecha mecanizada (%)', 'Riopaila, por año de cosecha (2026 = enero a septiembre)') +
-      caja('Cuánto rindió la cosecha mecanizada frente a la manual (% de TCH)', 'Misma suerte, mismo año; efecto estimado por el modelo') + seg('Cosecha') +
+    const h26 = sp.ha.find(r => r[0] === 2026) || [];
+    html = caja('Área con cosecha mecanizada (ha)', `Riopaila, por año de cosecha (2026 = enero a septiembre: ${nf(h26[1], 0)} ha de ${nf(h26[2], 0)} cosechadas)`) +
+      caja('Cuánto rindió la cosecha mecanizada frente a la manual (TCH)', 'Misma suerte, mismo año; efecto del modelo llevado a TCH con el TCH promedio de la cosecha manual de cada año') + seg('Cosecha') +
       (sp.alerta2027 ? satAlerta(sp.alerta2027) : '');
-    specs = [{ x: sp.anios.map(r => r[0]), series: [{ valores: sp.anios.map(r => r[1]), colores: sp.anios.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 0 }], destacarX: sp.anios.length - 1, yfmt: v => nf(v, 0) },
-      { x: sp.brecha.map(r => r[0]), series: [{ valores: sp.brecha.map(r => r[1]), colores: sp.brecha.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 1 }], alto: 200 }];
+    specs = [{ x: sp.ha.map(r => r[0]), series: [{ valores: sp.ha.map(r => r[1]), colores: sp.ha.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 0 }], destacarX: sp.ha.length - 1, yfmt: v => nf(v, 0), anchoEt: 40 },
+      { x: sp.brecha_tch.map(r => r[0]), series: [{ valores: sp.brecha_tch.map(r => r[1]), colores: sp.brecha_tch.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 1 }], alto: 200 }];
   } else if (id === 'corte-anterior') {
-    const mx = Math.max(...sp.tabla.map(r => Math.abs(r[3])));
-    html = `<div><h3>Suertes cosechadas en 2026 frente a su propia historia 2015-25, según cómo fue el corte anterior</h3>
-      ${divergentes(sp.tabla.map(r => ({ et: `${ANT[r[0]] || r[0]} · ${r[1]} cosechas`, v: r[3], color: r[0].startsWith('mec') ? 'var(--quita)' : r[3] < 0 ? 'var(--hist)' : 'var(--suma)' })), { max: mx })}
-      <p class="sub" style="margin-top:6px">Cambio del TCH en %. Las que venían de un corte mecanizado cayeron casi el doble.</p></div>` + afoCorte() +
+    const mx = Math.max(...sp.tabla.map(r => Math.abs(r[4])));
+    html = `<div><h3>Suertes cosechadas en 2026 frente a su propia historia 2015-25, según cómo fue el corte anterior (TCH)</h3>
+      ${divergentes(sp.tabla.map(r => ({ et: `${ANT[r[0]] || r[0]} · ${r[1]} cosechas · ${nf(r[2], 0)} ha`, v: r[4], color: r[0].startsWith('mec') ? 'var(--quita)' : r[4] < 0 ? 'var(--hist)' : 'var(--suma)' })), { max: mx })}
+      <p class="sub" style="margin-top:6px">Cambio del TCH frente a la historia de cada suerte. Las que venían de un corte mecanizado cayeron casi el doble.</p></div>` + afoCorte() +
       caja('El satélite lo ve: NDVI de la soca frente a la que salió de corte manual', 'Diferencia por mes de edad, misma suerte y mismo mes del año (3.500 ciclos 2019-2026)',
         leyenda([['var(--quita)', 'Corte anterior mecanizado, primera vez', 1], ['var(--mec)', 'Mecanizado repetido', 1]])) +
       caja('NDMI (humedad del follaje), igual', '', leyenda([['var(--quita)', 'Primera vez', 1], ['var(--mec)', 'Repetido', 1]])) +
@@ -394,25 +395,28 @@ function soporte(id, el) {
     html = caja(id === 'sequia' ? 'Déficit de agua sin riego al final del ciclo (mm)' : 'Lámina de riego al final del ciclo (mm)', 'Promedio de las cosechas de cada mes; normal = 2022-25 (años con registro de riego)', leyMes);
     specs = [porMes('mm')];
   } else if (id === 'freatico') {
-    html = caja('Área de Riopaila con el nivel freático a menos de 1 m (%)', 'Cada lectura quincenal de los pozos de observación, interpolada a cada suerte') +
+    html = caja('Área de Riopaila con el nivel freático a menos de 1 m (ha)', 'Cada lectura quincenal de los pozos de observación, interpolada a cada suerte') +
       caja('Nivel promedio del ciclo de las suertes cosechadas (m)', 'Promedio de las cosechas de cada mes; normal = 2022-25', leyMes);
     const t = sp.tiempo;
-    specs = [{ x: t.map(r => fecha(r[0]).split(' ').slice(1).join(' ')), series: [{ valores: t.map(r => r[1]), color: 'var(--quita)', d: 0 }], anchoBarra: 0.9, anchoEt: 64, yfmt: v => nf(v, 0) },
+    specs = [{ x: t.map(r => fecha(r[0]).split(' ').slice(1).join(' ')), series: [{ valores: t.map(r => r[3]), color: 'var(--quita)', d: 0 }], anchoBarra: 0.9, anchoEt: 64, yfmt: v => nf(v, 0) },
       { ...porMes('m', 2), yfmt: v => nf(v, 1) }];
   } else if (id === 'variedades') {
-    html = caja('Área cosechada por variedad (%)', '2026 frente a 2020-25 (mismos meses)', leyMes);
-    specs = [{ x: sp.v.map(r => r[0].replace('CC ', '')), series: [{ valores: sp.v.map(r => r[2]), color: 'var(--hist)' }, { valores: sp.v.map(r => r[1]), color: 'var(--quita)' }], anchoEt: 64 }];
+    const leyHa = leyenda([['var(--quita)', '2026'], ['var(--hist)', 'Normal: mezcla de 2020-25 en la misma área de 2026']]);
+    html = caja('Área cosechada por variedad (ha)', 'Enero a septiembre de 2026 frente a la mezcla de 2020-25 llevada al área cosechada en 2026', leyHa);
+    specs = [{ x: sp.v.map(r => r[0].replace('CC ', '')), series: [{ valores: sp.v.map(r => r[4]), color: 'var(--hist)', d: 0 }, { valores: sp.v.map(r => r[3]), color: 'var(--quita)', d: 0 }], anchoEt: 64, yfmt: v => nf(v, 0) }];
   } else if (id === 'corte-humedo') {
-    html = caja('Área cuyo corte anterior se hizo con el suelo húmedo (%)', `Mes del corte con 100 mm de lluvia o más · por año de cosecha. Lluvia promedio en el mes del corte anterior: 2026 ${nf(sp.mm[0], 0)} mm, normal ${nf(sp.mm[1], 0)} mm`);
-    specs = [{ x: sp.anios.map(r => r[0]), series: [{ valores: sp.anios.map(r => r[1]), colores: sp.anios.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 0 }], destacarX: sp.anios.length - 1, yfmt: v => nf(v, 0) }];
+    html = caja('Área cuyo corte anterior se hizo con el suelo húmedo (ha)', `Mes del corte con 100 mm de lluvia o más · por año de cosecha (2026 = enero a septiembre). Lluvia promedio en el mes del corte anterior: 2026 ${nf(sp.mm[0], 0)} mm, normal ${nf(sp.mm[1], 0)} mm`);
+    specs = [{ x: sp.ha.map(r => r[0]), series: [{ valores: sp.ha.map(r => r[1]), colores: sp.ha.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 0 }], destacarX: sp.ha.length - 1, yfmt: v => nf(v, 0), anchoEt: 40 }];
   } else if (id === 'corte') {
-    html = caja('Lo que pierde la soca en cada corte (% de TCH frente a la plantilla)', 'Misma suerte; efecto medido en 7.433 cosechas 2011-2026') +
-      caja('Área cosechada por número de corte (%)', `Promedio: 2026 ${nf(sp.prom[0])} cortes · normal ${nf(sp.prom[1])} cortes. Más segundos cortes y menos socas de 6 o más.`, leyMes);
-    specs = [{ x: sp.efecto.map(r => r[0]), series: [{ valores: sp.efecto.map(r => r[1]), color: 'var(--quita)', etiquetas: true, d: 1 }], yfmt: v => nf(v, 0), alto: 210 },
-      { x: sp.mezcla.map(r => r[0]), series: [{ valores: sp.mezcla.map(r => r[2]), color: 'var(--hist)' }, { valores: sp.mezcla.map(r => r[1]), color: 'var(--quita)' }], anchoEt: 64, yfmt: v => nf(v, 0) }];
+    const leyHa = leyenda([['var(--quita)', '2026'], ['var(--hist)', 'Normal: mezcla de 2020-25 en la misma área de 2026']]);
+    html = caja('Lo que pierde la soca en cada corte (TCH frente a la plantilla)', `Misma suerte; efecto medido en 7.433 cosechas 2011-2026, llevado a TCH con el TCH promedio de las plantillas 2020-25 (${nf(sp.plantilla_tch)} TCH)`) +
+      caja('Área cosechada por número de corte (ha)', `Promedio: 2026 ${nf(sp.prom[0])} cortes · normal ${nf(sp.prom[1])} cortes. Más segundos cortes y menos socas de 6 o más.`, leyHa);
+    specs = [{ x: sp.efecto.map(r => r[0]), series: [{ valores: sp.efecto.map(r => r[2]), color: 'var(--quita)', etiquetas: true, d: 1 }], yfmt: v => nf(v, 0), alto: 210 },
+      { x: sp.mezcla.map(r => r[0]), series: [{ valores: sp.mezcla.map(r => r[4]), color: 'var(--hist)', d: 0 }, { valores: sp.mezcla.map(r => r[3]), color: 'var(--quita)', d: 0 }], anchoEt: 64, yfmt: v => nf(v, 0) }];
   } else if (id === 'edad') {
-    html = caja('Área cosechada por edad (%)', `Edad promedio: 2026 ${nf(sp.prom[0])} meses · normal ${nf(sp.prom[1])} meses`, leyMes);
-    specs = [{ x: sp.e.map(r => r[0]), series: [{ valores: sp.e.map(r => r[2]), color: 'var(--hist)' }, { valores: sp.e.map(r => r[1]), color: 'var(--quita)' }], ejeX: 'meses' }];
+    const leyHa = leyenda([['var(--quita)', '2026'], ['var(--hist)', 'Normal: mezcla de 2020-25 en la misma área de 2026']]);
+    html = caja('Área cosechada por edad (ha)', `Edad promedio: 2026 ${nf(sp.prom[0])} meses · normal ${nf(sp.prom[1])} meses`, leyHa);
+    specs = [{ x: sp.e.map(r => r[0]), series: [{ valores: sp.e.map(r => r[4]), color: 'var(--hist)', d: 0 }, { valores: sp.e.map(r => r[3]), color: 'var(--quita)', d: 0 }], ejeX: 'meses', yfmt: v => nf(v, 0) }];
   }
   el.innerHTML = `<div class="pila">${html}</div>`;
   bloques.forEach((b, i) => specs[i] && grafico(document.getElementById(b), specs[i]));
@@ -466,9 +470,13 @@ function satAlerta(a) {
     <div id="t-alerta"></div></div>`;
 }
 
+// 2026 frente a la historia por grupo, en TCH: el % de la validación × el TCH histórico ponderado del grupo
 function seg(dim) {
   const rows = V.segmentos.filter(r => r[0] === dim);
-  return `<div><h3>2026 frente a la historia, por tipo de cosecha (%)</h3>${divergentes(rows.map(r => ({ et: `${r[1]} · ${r[2]} cosechas`, v: r[3], dato: `el modelo sin ver 2026 predijo ${sg(r[4])} %` })))}</div>`;
+  const histG = g => { const L = S.filter(s => s.hist != null && (dim === 'Cosecha' ? s.tipo === g : true)), a = L.reduce((x, s) => x + s.a, 0);
+    return a ? L.reduce((x, s) => x + s.hist * s.a, 0) / a : R.hist; };
+  return `<div><h3>2026 frente a la historia, por tipo de cosecha (TCH)</h3>${divergentes(rows.map(r => { const h = histG(r[1]);
+    return { et: `${r[1]} · ${r[2]} cosechas`, v: r[3] / 100 * h, dato: `el modelo sin ver 2026 predijo ${sg(r[4] / 100 * h)} TCH` }; }))}</div>`;
 }
 
 function ejemplo() {
