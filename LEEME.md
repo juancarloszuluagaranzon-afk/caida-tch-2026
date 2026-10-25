@@ -6,7 +6,7 @@ Paquete armado el 25 de octubre de 2026 para seguir el trabajo desde otra cuenta
 
 | Carpeta | Qué tiene |
 | --- | --- |
-| `Caida TCH 2026 - programas/` | Programas en Python, `datos intermedios/` (incluye la comparación por satélite) e informe en línea (`tablero_web/`). Su `CLAUDE.md` es el traspaso completo: reglas, cifras vigentes, la cadena de programas en orden y las fuentes. |
+| `Caida TCH 2026 - programas/` | Programas en Python y `datos intermedios/` (incluye la comparación por satélite); el informe en línea está en `web/`, en la raíz del repositorio. Su `CLAUDE.md` es el traspaso completo: reglas, cifras vigentes, la cadena de programas en orden y las fuentes. |
 | `salidas/` | Soporte del modelo v3, matriz ponderada v3, validación v3 y análisis del madurante, en Excel. |
 | `documento_gerente/` | Texto del documento para el gerente en Markdown. Las gráficas y la imagen del documento original quedan como marcas de texto. |
 | `presentacion/` | Las 11 láminas (`project/deck.json` y `project/slides/*.html`) y sus imágenes en `imagenes/`. Cada lámina nombra la imagen como `/_blob/<id>` y el archivo lleva ese mismo id. |

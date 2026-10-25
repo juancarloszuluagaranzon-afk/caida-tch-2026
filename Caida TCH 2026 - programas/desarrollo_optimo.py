@@ -5,7 +5,7 @@ Entradas:
   · «optimo de las variedades.xlsx»: hoja Matriz (una fila por cosecha ene-sep 2026; aforo suerte a suerte en las
     columnas Alltura [cm], Población [tallos/m] y Diametro [cm]) y hoja Optimo (altura, diámetro y tallos/m del óptimo
     de cada variedad).
-  · tablero_web\data\suertes.json (informe_datos.py): TCH real, historia 2020-25, PPTO, corte anterior y tipo de cosecha.
+  · web\data\suertes.json (informe_datos.py): TCH real, historia 2020-25, PPTO, corte anterior y tipo de cosecha.
 Para cada cosecha con aforo: % del óptimo de su variedad en altura, población y diámetro, y un índice de peso de caña
 (población × altura × diámetro², frente al mismo producto del óptimo). Luego:
   · despoblación según el corte anterior (el aforo se mide en la caña en pie, antes de la cosecha de 2026: la población
@@ -14,8 +14,8 @@ Para cada cosecha con aforo: % del óptimo de su variedad en altura, población 
 Todo ponderado por área; regresiones con errores robustos. Sin nombres de personas en la salida.
 
 Uso: <tch-motor>\.venv-gee\Scripts\python.exe desarrollo_optimo.py <optimo de las variedades.xlsx> <suertes.json> <salida.xlsx>
-       [<tablero_web>]
-Con <tablero_web> escribe además data/desarrollo.json para el informe (pestaña Desarrollo, ficha de cada suerte y causa
+       [<web>]
+Con <web> (la carpeta del informe) escribe además data/desarrollo.json para el informe (pestaña Desarrollo, ficha de cada suerte y causa
 Corte anterior mecanizado). Va después de informe_datos.py, porque lee su suertes.json.
 """
 import json

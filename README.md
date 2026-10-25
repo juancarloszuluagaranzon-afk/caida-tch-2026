@@ -8,7 +8,8 @@ Por qué cayó el TCH de lo cosechado en Riopaila de enero a septiembre de 2026,
 
 | Carpeta | Qué tiene |
 | --- | --- |
-| `Caida TCH 2026 - programas/` | Programas en Python, `datos intermedios/` y el informe en línea (`tablero_web/`). Su `CLAUDE.md` es el traspaso completo: reglas, cifras vigentes, la cadena de programas en orden y las fuentes. |
+| `Caida TCH 2026 - programas/` | Programas en Python y `datos intermedios/`. Su `CLAUDE.md` es el traspaso completo: reglas, cifras vigentes, la cadena de programas en orden y las fuentes. |
+| `web/` | El informe en línea (antes `Caida TCH 2026 - programas/tablero_web/`) y la función del chat (`api/chat.js`). |
 | `salidas/` | Soporte del modelo v3, matriz ponderada v3, validación v3 y análisis del madurante, en Excel. |
 | `documento_gerente/` | Texto del documento para el gerente, en Markdown. |
 | `presentacion/` | Las 11 láminas de la presentación (formato Slides de claude.ai) y sus imágenes. |
@@ -17,7 +18,7 @@ Por qué cayó el TCH de lo cosechado en Riopaila de enero a septiembre de 2026,
 
 ## Informe en línea
 
-`Caida TCH 2026 - programas/tablero_web/` es un sitio estático (index.html, app.js, data/*.json, img/). En Vercel, el proyecto `caida-tch-yy76h1` publica esa carpeta: **Settings → Build and Deployment → Root Directory** = `Caida TCH 2026 - programas/tablero_web`, sin comando de compilación.
+`web/` es un sitio estático (index.html, app.js, data/*.json, img/) con una función de Vercel para el chat (`api/chat.js`, Gemini; la llave va en la variable de entorno `GEMINI_API_KEY` del proyecto, nunca en el repositorio). En Vercel, el proyecto `caida-tch-yy76h1` publica esa carpeta: **Settings → Build and Deployment → Root Directory** = `web`, sin comando de compilación. Está en la raíz porque Vercel no acepta funciones en rutas con espacios.
 
 ## Correr la cadena
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Datos del informe navegable «Caída del TCH Riopaila 2026» (tablero_web): cada causa con sus suertes y cada suerte con
+"""Datos del informe navegable «Caída del TCH Riopaila 2026» (carpeta web/ del repositorio): cada causa con sus suertes y cada suerte con
 su ficha, para no tener que abrir el Excel a buscar la justificación.
 
 Entradas (todas ya calculadas por la cadena):
