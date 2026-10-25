@@ -207,55 +207,144 @@ const COLS = {
   'incendio': [{ t: 'Incendio', f: s => s.inc ? 'Sí' : 'No', v: s => s.inc }],
 };
 
+// ---------------------------------------------------------------- filtros (los mismos en Resumen y Suertes; cada vista guarda los suyos)
+const FILTRO0 = { q: '', h: '', z: '', za: '', v: '', t: '', m: '' };
+const SIN = '(sin dato)';                                  // variedad o zona agroecológica vacía en el Maestro
+const valV = s => s.v || SIN, valZA = s => s.za || SIN;
+const ordenZA = (a, b) => a === SIN ? 1 : b === SIN ? -1 : parseInt(a) - parseInt(b) || a.localeCompare(b);   // 1H1, 1H2, 4H1… 23H1
+const ordenV = (a, b) => (a === SIN) - (b === SIN) || (a === 'VARIAS') - (b === 'VARIAS') || a.localeCompare(b);
+function filtrosHtml(f) {
+  const hac = [...new Set(S.map(s => s.h).filter(Boolean))].sort();
+  const zas = [...new Set(S.map(valZA))].sort(ordenZA), vs = [...new Set(S.map(valV))].sort(ordenV);
+  const op = (v, t, sel) => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(t)}</option>`;
+  return `<div class="filtros">
+      <input id="q" type="search" placeholder="Buscar suerte o hacienda" aria-label="Buscar suerte o hacienda" value="${esc(f.q)}">
+      <label>Hacienda <select id="fh">${op('', 'Todas', f.h)}${hac.map(h => op(h, h, f.h)).join('')}</select></label>
+      <label>Zona <select id="fz">${op('', 'Todas', f.z)}${op('1', '1', f.z)}${op('2', '2', f.z)}</select></label>
+      <label>Zona agroecológica <select id="fza">${op('', 'Todas', f.za)}${zas.map(z => op(z, z, f.za)).join('')}</select></label>
+      <label>Variedad <select id="fv">${op('', 'Todas', f.v)}${vs.map(v => op(v, v, f.v)).join('')}</select></label>
+      <label>Cosecha <select id="ft">${op('', 'Todas', f.t)}${op('Mecanizada', 'Mecanizada', f.t)}${op('Manual', 'Manual', f.t)}</select></label>
+      <label>Mes <select id="fm">${op('', 'Todos', f.m)}${MES.slice(0, 9).map((m, i) => op(String(i + 1), m, f.m)).join('')}</select></label>
+    </div>`;
+}
+const leerFiltros = () => ({ q: document.getElementById('q').value.trim().toLowerCase(), h: document.getElementById('fh').value,
+  z: document.getElementById('fz').value, za: document.getElementById('fza').value, v: document.getElementById('fv').value,
+  t: document.getElementById('ft').value, m: document.getElementById('fm').value });
+const filtrar = f => S.filter(s => (!f.q || s.s.includes(f.q) || s.h.toLowerCase().includes(f.q)) && (!f.h || s.h === f.h) &&
+  (!f.z || String(s.z) === f.z) && (!f.za || valZA(s) === f.za) && (!f.v || valV(s) === f.v) &&
+  (!f.t || s.tipo === f.t) && (!f.m || String(s.m) === f.m));
+const escucharFiltros = fn => ['q', 'fh', 'fz', 'fza', 'fv', 'ft', 'fm'].forEach(i => document.getElementById(i).addEventListener('input', fn));
+
+// promedios ponderados por área de un grupo de cosechas (los mismos cálculos de informe_datos.py: sin filtro dan resumen.json)
+function agregado(rows) {
+  const pond = (L, fn) => { const a = L.reduce((x, s) => x + s.a, 0); return a ? L.reduce((x, s) => x + fn(s) * s.a, 0) / a : null; };
+  const h = rows.filter(s => s.hist != null), p = h.filter(s => s.ppto != null);
+  const ha = h.reduce((x, s) => x + s.a, 0), hist = pond(h, s => s.hist), caida = pond(h, s => s.caida);
+  const ap = {};
+  C.causas.forEach(c => ap[c.id] = pond(h, s => s.ap[c.id] || 0));
+  return { n: rows.length, cosechas: h.length, ha, hist, real: pond(h, s => s.real), caida, caida_pct: hist ? -100 * caida / hist : null,
+    t_caida: h.reduce((x, s) => x + s.caida * s.a, 0), sin_explicar: pond(h, s => s.se), ap,
+    puente: { cosechas: p.length, ha: p.reduce((x, s) => x + s.a, 0), ppto: pond(p, s => s.ppto), hist: pond(p, s => s.hist), real: pond(p, s => s.real),
+      t: p.reduce((x, s) => x + (s.ppto - s.real) * s.a, 0) } };
+}
+
+function textoFiltro(f) {
+  const t = [];
+  if (f.q) t.push(`«${f.q}»`);
+  if (f.h) t.push(`hacienda ${f.h}`);
+  if (f.z) t.push(`zona ${f.z}`);
+  if (f.za) t.push(`zona agroecológica ${f.za}`);
+  if (f.v) t.push(`variedad ${f.v}`);
+  if (f.t) t.push(`cosecha ${f.t.toLowerCase()}`);
+  if (f.m) t.push(MES[f.m - 1]);
+  return t.join(' · ');
+}
+
 // ---------------------------------------------------------------- vista: resumen
+let filtroRes = { ...FILTRO0 };
 function vResumen() {
-  const P = R.puente, brecha = P.ppto - P.real, sobre = P.ppto - P.hist, caida = P.hist - P.real;
-  const filas = C.causas.map(c => ({ et: c.nombre, v: -c.t_ha, href: '#causa/' + c.id, g: c.grupo }))
-    .filter(f => Math.abs(f.v) >= 0.05).sort((a, b) => a.v - b.v);
-  filas.push({ et: 'Sin explicar', v: -R.sin_explicar, color: 'var(--hist)' });
+  $app.innerHTML = `<div class="pila">
+    <div><h2>¿Cuánto cayó el TCH y por qué?</h2><p class="sub" id="res-sub"></p></div>
+    ${filtrosHtml(filtroRes)}<div id="res-cuerpo" class="pila"></div></div>`;
+  const pintar = () => { filtroRes = leerFiltros(); pintarResumen(filtroRes); };
+  escucharFiltros(pintar);
+  pintarResumen(filtroRes);
+}
+
+function pintarResumen(f) {
+  const filtrado = textoFiltro(f), A = agregado(filtrar(f)), P = A.puente;
+  if (!filtrado) A.t_caida = R.t_caida;  // la caída por suerte viene redondeada: sin filtro, la cifra oficial
+  const sub = document.getElementById('res-sub'), $c = document.getElementById('res-cuerpo');
+  sub.innerHTML = filtrado
+    ? `Filtro: <b>${esc(filtrado)}</b> · ${A.n} de ${S.length} cosechas; ${A.cosechas} con historia (${nf(A.ha, 0)} ha). Cada suerte se compara con su propio promedio 2020-25.
+       <button type="button" id="res-limpiar" class="limpiar">Quitar filtros</button>`
+    : `${A.cosechas} cosechas de ${R.periodo} con historia (${nf(A.ha, 0)} ha). Cada suerte se compara con su propio promedio 2020-25.`;
+  const lim = document.getElementById('res-limpiar');
+  if (lim) lim.onclick = () => { filtroRes = { ...FILTRO0 }; vResumen(); };
+  if (!A.cosechas) {
+    $c.innerHTML = `<div class="nota">Ninguna cosecha con historia 2020-25 cumple el filtro${A.n ? ` (las ${A.n} que lo cumplen no tienen con qué compararse)` : ''}.</div>`;
+    return;
+  }
+  const subio = A.caida < 0, sobrePPTO = P.cosechas && P.t < 0;
+  const filas = C.causas.map(c => ({ et: c.nombre, v: -A.ap[c.id], href: '#causa/' + c.id, g: c.grupo }))
+    .filter(x => Math.abs(x.v) >= 0.05).sort((a, b) => a.v - b.v);
+  filas.push({ et: 'Sin explicar', v: -A.sin_explicar, color: 'var(--hist)' });
   const grupos = {};
-  C.causas.forEach(c => grupos[c.grupo] = (grupos[c.grupo] || 0) - c.t_ha);
-  const mxp = P.ppto * 1.02;
-  const barraP = (et, v, col) => `<div style="display:grid;grid-template-columns:110px 1fr 56px;gap:10px;align-items:center;margin:4px 0">
-    <span style="font-size:14px">${et}</span><div style="background:var(--surface-2);border-radius:3px"><div style="height:18px;width:${100 * v / mxp}%;background:${col};border-radius:3px"></div></div>
-    <b class="num" style="text-align:right">${nf(v)}</b></div>`;
-  $app.innerHTML = `
-  <div class="pila">
-    <div><h2>¿Cuánto cayó el TCH y por qué?</h2>
-      <p class="sub">${R.cosechas} cosechas de ${R.periodo} con historia (${nf(R.ha, 0)} ha). Cada suerte se compara con su propio promedio 2020-25.</p></div>
+  C.causas.forEach(c => grupos[c.grupo] = (grupos[c.grupo] || 0) - A.ap[c.id]);
+  const pocas = A.cosechas < 20
+    ? `<div class="nota"><b>Pocas cosechas.</b> Son ${A.cosechas} cosechas con historia: el promedio depende mucho de unas pocas suertes y cada causa puede moverse bastante. Tómelo como orientación y revise las suertes una por una.</div>` : '';
+  $c.innerHTML = `${pocas}
     <div class="kpis">
-      <div class="kpi"><div class="et">Historia 2020-25</div><div class="v num">${nf(R.hist)} <small>TCH</small></div></div>
-      <div class="kpi real"><div class="et">Real 2026</div><div class="v num">${nf(R.real)} <small>TCH</small></div></div>
-      <div class="kpi caida"><div class="et">Caída</div><div class="v num">−${nf(R.caida)} <small>TCH · ${nf(R.caida_pct)} %</small></div></div>
-      <div class="kpi"><div class="et">Toneladas perdidas</div><div class="v num">${nf(R.t_caida, 0)} <small>t</small></div></div>
-      <div class="kpi ppto"><div class="et">PPTO 2026 (Maestro)</div><div class="v num">${nf(P.ppto)} <small>TCH</small></div></div>
+      <div class="kpi"><div class="et">Histórico 2020-25</div><div class="v num">${nf(A.hist)} <small>TCH</small></div></div>
+      <div class="kpi ppto"><div class="et">Presupuesto 2026</div><div class="v num">${nf(P.ppto)} <small>TCH</small></div></div>
+      <div class="kpi real"><div class="et">Real 2026</div><div class="v num">${nf(A.real)} <small>TCH</small></div></div>
+      <div class="kpi ${subio ? 'subio' : 'caida'}"><div class="et">Toneladas ${subio ? 'ganadas' : 'perdidas'} frente al histórico</div>
+        <div class="v num">${nf(Math.abs(A.t_caida), 0)} <small>t</small></div><div class="pie num">${sg(-A.caida)} TCH · ${sg(A.caida_pct)} %</div></div>
+      <div class="kpi ${sobrePPTO ? 'subio' : 'caida'}"><div class="et">Toneladas ${sobrePPTO ? 'ganadas' : 'perdidas'} frente al presupuesto</div>
+        <div class="v num">${P.cosechas ? nf(Math.abs(P.t), 0) : '—'} <small>t</small></div>
+        <div class="pie num">${P.cosechas ? `${sg(P.real - P.ppto)} TCH · ${sg(100 * (P.real - P.ppto) / P.ppto)} %${P.cosechas < A.cosechas ? ` · ${P.cosechas} cosechas con presupuesto` : ''}` : 'Sin presupuesto en el Maestro'}</div></div>
     </div>
     <div class="grid2">
       <div class="caja"><h3>Lo que quitó y lo que sumó cada causa (TCH)</h3>
-        <p class="sub" style="margin-bottom:8px">Toque una causa para ver sus suertes, sus datos y la gráfica de soporte.</p>
+        <p class="sub" style="margin-bottom:8px">Toque una causa para ver sus suertes, sus datos y la gráfica de soporte${filtrado ? ' (la página de la causa muestra todas las suertes, sin este filtro)' : ''}.</p>
         ${divergentes(filas)}
-        <p class="sub" style="margin:10px 0 0">Suman ${sg(-R.caida)} TCH: de ${nf(R.hist)} a ${nf(R.real)} TCH.</p></div>
+        <p class="sub" style="margin:10px 0 0">Suman ${sg(-A.caida)} TCH: de ${nf(A.hist)} a ${nf(A.real)} TCH.</p></div>
       <div class="pila">
-        <div class="caja"><h3>Contra el presupuesto</h3>
-          <p class="sub" style="margin-bottom:8px">${P.cosechas} cosechas con PPTO en el Maestro de Suertes 2026 (columna AG) · ${nf(P.ha, 0)} ha</p>
-          ${barraP('PPTO', P.ppto, 'var(--ppto-fill)')}${barraP('Historia', P.hist, 'var(--hist)')}${barraP('Real', P.real, 'var(--real)')}
-          <div style="margin-top:12px;font-size:14px">Brecha contra el PPTO: <b class="num">${nf(brecha)} TCH</b></div>
-          <div style="display:flex;height:22px;border-radius:3px;overflow:hidden;margin:6px 0">
-            <div style="width:${100 * sobre / brecha}%;background:var(--ppto-fill)" title="PPTO por encima de la historia"></div>
-            <div style="width:${100 * caida / brecha}%;background:var(--quita)" title="Caída"></div></div>
-          ${leyenda([['var(--ppto-fill)', `PPTO por encima de lo que esas suertes daban: ${nf(sobre)} TCH (${nf(100 * sobre / brecha, 0)} %)`],
-            ['var(--quita)', `Caída real: ${nf(caida)} TCH (${nf(100 * caida / brecha, 0)} %)`]])}
-          <p class="sub" style="margin:10px 0 0">Las causas de campo explican la caída frente a la historia. El tramo del PPTO por encima de la historia no lo explica ninguna causa de campo: es cómo se armó el presupuesto.</p></div>
+        <div class="caja"><h3>Contra el presupuesto</h3>${puentePPTO(P)}</div>
         <div class="caja"><h3>Por tipo de causa (TCH)</h3>
           ${divergentes(Object.entries(grupos).sort((a, b) => a[1] - b[1]).map(([g, v]) => ({ et: g, v })))}</div>
       </div>
     </div>
-    <div class="nota"><b>Qué tan seguro es.</b> Con los datos de 2026, ${R.sin_explicar >= 0 ? `las variables medidas explican el ${nf(100 * (1 - R.sin_explicar / R.caida), 0)} % de la caída promedio (quedan ${nf(R.sin_explicar)} TCH sin explicar).` : `las causas medidas suman ${nf(R.caida - R.sin_explicar)} TCH frente a ${nf(R.caida)} que cayó: dan cuenta de toda la caída promedio.`}
+    <div class="nota"><b>Qué tan seguro es.</b> Con los datos de 2026, ${subio
+      ? `en este grupo el TCH no cayó frente a la historia: las barras muestran qué le quitó y qué le sumó (quedan ${sg(-A.sin_explicar)} TCH sin explicar).`
+      : A.sin_explicar >= 0 ? `las variables medidas explican el ${nf(100 * (1 - A.sin_explicar / A.caida), 0)} % de la caída promedio (quedan ${nf(A.sin_explicar)} TCH sin explicar).`
+      : `las causas medidas suman ${nf(A.caida - A.sin_explicar)} TCH frente a ${nf(A.caida)} que cayó: dan cuenta de toda la caída promedio.`}
       La prueba dura es sin ver 2026: el modelo ajustado solo con 2011-2025 predijo el ${nf(prediccion().pct, 0)} % de la caída y,
-      año por año desde 2013, se movió con lo real (correlación ${nf(V.corr, 2)}). Suerte por suerte explica una parte; en cada ficha se ve
-      cuánto queda sin explicar. <a href="#prueba">Ver la prueba</a></div>
-  </div>`;
-  enlazarFilas($app);
+      año por año desde 2013, se movió con lo real (correlación ${nf(V.corr, 2)})${filtrado ? '; esa prueba es del modelo con todas las suertes y no cambia con el filtro' : ''}.
+      Suerte por suerte explica una parte; en cada ficha se ve cuánto queda sin explicar. <a href="#prueba">Ver la prueba</a></div>`;
+  enlazarFilas($c);
+}
+
+function puentePPTO(P) {
+  if (!P.cosechas) return '<p class="sub" style="margin:0">Ninguna de estas cosechas tiene PPTO en el Maestro de Suertes 2026.</p>';
+  const brecha = P.ppto - P.real, sobre = P.ppto - P.hist, caida = P.hist - P.real;
+  const mxp = Math.max(P.ppto, P.hist, P.real) * 1.02;
+  const barraP = (et, v, col) => `<div style="display:grid;grid-template-columns:110px 1fr 56px;gap:10px;align-items:center;margin:4px 0">
+    <span style="font-size:14px">${et}</span><div style="background:var(--surface-2);border-radius:3px"><div style="height:18px;width:${100 * v / mxp}%;background:${col};border-radius:3px"></div></div>
+    <b class="num" style="text-align:right">${nf(v)}</b></div>`;
+  // la barra partida solo tiene sentido cuando los dos tramos son brecha (PPTO ≥ historia ≥ real)
+  const partida = brecha > 0 && sobre >= 0 && caida >= 0;
+  return `<p class="sub" style="margin-bottom:8px">${P.cosechas} cosechas con PPTO en el Maestro de Suertes 2026 (columna AG) · ${nf(P.ha, 0)} ha</p>
+    ${barraP('PPTO', P.ppto, 'var(--ppto-fill)')}${barraP('Historia', P.hist, 'var(--hist)')}${barraP('Real', P.real, 'var(--real)')}
+    <div style="margin-top:12px;font-size:14px">${brecha >= 0 ? 'Brecha contra el PPTO' : 'Por encima del PPTO'}: <b class="num">${nf(Math.abs(brecha))} TCH</b></div>
+    ${partida ? `<div style="display:flex;height:22px;border-radius:3px;overflow:hidden;margin:6px 0">
+      <div style="width:${100 * sobre / brecha}%;background:var(--ppto-fill)" title="PPTO por encima de la historia"></div>
+      <div style="width:${100 * caida / brecha}%;background:var(--quita)" title="Caída"></div></div>
+    ${leyenda([['var(--ppto-fill)', `PPTO por encima de lo que esas suertes daban: ${nf(sobre)} TCH (${nf(100 * sobre / brecha, 0)} %)`],
+      ['var(--quita)', `Caída real: ${nf(caida)} TCH (${nf(100 * caida / brecha, 0)} %)`]])}`
+    : `<p style="margin:6px 0 0;font-size:14px">PPTO ${sobre >= 0 ? 'por encima' : 'por debajo'} de la historia: <b class="num">${nf(Math.abs(sobre))} TCH</b> ·
+      real ${caida >= 0 ? 'por debajo' : 'por encima'} de la historia: <b class="num">${nf(Math.abs(caida))} TCH</b></p>`}
+    <p class="sub" style="margin:10px 0 0">Las causas de campo explican la caída frente a la historia. El tramo del PPTO por encima de la historia no lo explica ninguna causa de campo: es cómo se armó el presupuesto.</p>`;
 }
 
 function prediccion() {
@@ -442,16 +531,9 @@ function vCausa(id) {
 
 // ---------------------------------------------------------------- vista: suertes
 function vSuertes() {
-  const hac = [...new Set(S.map(s => s.h).filter(Boolean))].sort();
   $app.innerHTML = `<div class="pila"><div><h2>Suertes cosechadas en 2026</h2>
     <p class="sub">${S.length} cosechas de enero a septiembre. Toque una para ver por qué cayó o subió.</p></div>
-    <div class="filtros">
-      <input id="q" type="search" placeholder="Buscar suerte o hacienda" aria-label="Buscar suerte o hacienda">
-      <label>Hacienda <select id="fh"><option value="">Todas</option>${hac.map(h => `<option>${esc(h)}</option>`).join('')}</select></label>
-      <label>Zona <select id="fz"><option value="">Todas</option><option>1</option><option>2</option></select></label>
-      <label>Cosecha <select id="ft"><option value="">Todas</option><option>Mecanizada</option><option>Manual</option></select></label>
-      <label>Mes <select id="fm"><option value="">Todos</option>${MES.slice(0, 9).map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select></label>
-    </div><div id="t-s"></div></div>`;
+    ${filtrosHtml(FILTRO0)}<div id="t-s"></div></div>`;
   const principal = s => {
     const best = C.causas.map(c => [c, s.ap[c.id] || 0]).sort((a, b) => b[1] - a[1])[0];
     return best && best[1] > 0.5 ? `<a href="#causa/${best[0].id}">${esc(best[0].nombre)}</a> <span class="num t-q">${sg(-best[1])}</span>` : '—';
@@ -462,14 +544,8 @@ function vSuertes() {
     { t: 'vs PPTO', n: true, f: s => s.ppto == null ? '—' : `<span class="${clsImp(s.real - s.ppto)}">${sg(s.real - s.ppto)}</span>`, v: s => s.ppto == null ? null : s.real - s.ppto, asc: true },
     { t: 'Causa que más le quitó', f: principal, v: null },
     { t: 'Sin explicar', n: true, f: s => sg(imp(s.se)), v: s => imp(s.se), asc: true }];
-  const pintar = () => {
-    const q = document.getElementById('q').value.trim().toLowerCase(), h = document.getElementById('fh').value,
-      z = document.getElementById('fz').value, t = document.getElementById('ft').value, m = document.getElementById('fm').value;
-    const rows = S.filter(s => (!q || s.s.includes(q) || s.h.toLowerCase().includes(q)) && (!h || s.h === h) && (!z || String(s.z) === z) &&
-      (!t || s.tipo === t) && (!m || String(s.m) === m));
-    tabla(document.getElementById('t-s'), cols, rows, { orden: 9, dir: 1 });
-  };
-  ['q', 'fh', 'fz', 'ft', 'fm'].forEach(i => document.getElementById(i).addEventListener('input', pintar));
+  const pintar = () => tabla(document.getElementById('t-s'), cols, filtrar(leerFiltros()), { orden: 9, dir: 1 });
+  escucharFiltros(pintar);
   pintar();
 }
 

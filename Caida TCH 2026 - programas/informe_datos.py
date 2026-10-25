@@ -103,13 +103,13 @@ CAUSAS = [
      "mide": "Si el corte que dejó esta soca fue mecanizado: la cepa queda aporreada y rebrota menos.",
      "efecto": f"Soca que sale de un corte mecanizado después de manual: {es(coef.loc['pm_new', 'efecto %'])} % de TCH; de dos "
                f"cortes mecanizados seguidos: {es(coef.loc['pm_seg', 'efecto %'])} % (2011-2026)."},
-    {"id": "corte-humedo", "nombre": "Corte anterior en suelo húmedo", "col": "Corte anterior en suelo húmedo",
+    {"id": "corte-humedo", "nombre": "Cosecha con suelo húmedo", "col": "Corte anterior en suelo húmedo",
      "grupo": "No controlable",
      "mide": "Lluvia en el mes del corte anterior en la estación de la suerte. Si el corte se hizo con el suelo húmedo, la "
              "cepa queda más golpeada y la soca rebrota menos; se toma como húmedo un mes con 100 mm o más.",
      "efecto": f"Por cada 100 mm de lluvia en el mes del corte anterior: {es(coef.loc['ca_mm100', 'efecto %'])} % de TCH "
                f"({ep(coef.loc['ca_mm100', 'p'])}). La diferencia entre corte manual y mecanizado no fue confiable."},
-    {"id": "calor", "nombre": "Calor antes de cosechar", "col": "Días Tmax >32 °C", "grupo": "No controlable",
+    {"id": "calor", "nombre": "Temperatura mayor a 32 °C 30 días antes de cosecha", "col": "Días Tmax >32 °C", "grupo": "No controlable",
      "mide": "Días con temperatura máxima por encima de 32 °C en los 30 días antes del corte (EMA La Paila o Bugalagrande).",
      "efecto": f"Cada día por encima de 32 °C: {es(coef.loc['d32', 'efecto %'], 2)} % de TCH."},
     {"id": "sequia", "nombre": "Sequía al final del ciclo", "col": "Balance hídrico: sequía al final", "grupo": "No controlable",
@@ -134,7 +134,7 @@ CAUSAS = [
     {"id": "renovacion", "nombre": "Renovación no hecha", "col": "No renovación", "grupo": "Flujo de caja",
      "mide": "Suertes del plan de renovación 2025 que siguieron como soca.",
      "efecto": f"Suerte que debía renovarse y no se renovó: {es(coef.loc['no_renov', 'efecto %'])} % de TCH (poco seguro, {ep(coef.loc['no_renov', 'p'])})."},
-    {"id": "roturacion", "nombre": "Roturación tardía", "col": "Oportunidad roturación", "grupo": "Flujo de caja",
+    {"id": "roturacion", "nombre": "Oportunidad de roturación", "col": "Oportunidad roturación", "grupo": "Flujo de caja",
      "mide": "Roturación fuera de oportunidad (control de roturación; si no está, SimpleAgri).",
      "efecto": f"Roturación tardía: {es(coef.loc['rot_tard', 'efecto %'])} % de TCH ({ep(coef.loc['rot_tard', 'p'])}). "
                f"Roturar con el suelo húmedo (lluvia en los 5 días antes) no mostró efecto confiable: "
@@ -142,7 +142,7 @@ CAUSAS = [
     {"id": "malezas", "nombre": "Control de malezas", "col": "Control de malezas", "grupo": "Flujo de caja",
      "mide": "Días del corte al primer herbicida; cuenta el atraso después de 90 días.",
      "efecto": f"Por mes de atraso después de 90 días: {es(coef.loc['mal_extra30', 'efecto %'])} % de TCH ({ep(coef.loc['mal_extra30', 'p'])})."},
-    {"id": "fertilizacion", "nombre": "Fertilización tardía", "col": "Oportunidad fertilización", "grupo": "Flujo de caja",
+    {"id": "fertilizacion", "nombre": "Oportunidad de fertilización", "col": "Oportunidad fertilización", "grupo": "Flujo de caja",
      "mide": "Días del corte a la fertilización; cuenta si pasó de 120 días.",
      "efecto": f"Fertilización después de 120 días: {es(coef.loc['fert_120', 'efecto %'])} % de TCH ({ep(coef.loc['fert_120', 'p'])}). "
                f"Fertilizar con el suelo húmedo no mostró efecto confiable: "
