@@ -1,12 +1,25 @@
 // Chat del informe «Caída del TCH Riopaila 2026»: responde preguntas solo con los datos del informe, usando Gemini
 // (Google AI Studio). Función de Vercel; la llave va en la variable de entorno GEMINI_API_KEY (nunca en la página).
-// Opcional: GEMINI_MODEL (por defecto gemini-2.5-flash).
+// Opcional: GEMINI_MODEL (por defecto gemini-flash-latest; si no existe, usa el «flash» más nuevo de la cuenta).
 // POST /api/chat  {pregunta, historial: [{rol: 'usuario'|'modelo', texto}], suerte: clave de la ficha abierta o null}
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
-const MODELO = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+let MODELO = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+const API = 'https://generativelanguage.googleapis.com/v1beta';
+
+// si el modelo no existe (Google retira y renombra modelos), elige el «flash» más nuevo de los disponibles para la llave
+async function elegirModelo() {
+  const r = await fetch(`${API}/models?pageSize=200`, { headers: { 'x-goog-api-key': process.env.GEMINI_API_KEY } });
+  const j = await r.json();
+  const ms = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => m.name.replace('models/', ''))
+    .filter(n => /flash/.test(n) && !/(lite|image|tts|live|audio|thinking|exp|preview)/.test(n));
+  const ver = n => parseFloat((n.match(/gemini-(\d+(?:\.\d+)?)/) || [0, 0])[1]);
+  ms.sort((a, b) => ver(b) - ver(a) || a.length - b.length);
+  return ms[0] || null;
+}
 const POR_MINUTO = 6, POR_HORA = 120;   // por IP y por instancia: freno al gasto, no una garantía
 const MAX_PREGUNTA = 600, MAX_HISTORIAL = 6;
 
@@ -96,14 +109,22 @@ module.exports = async (req, res) => {
     .map(h => ({ role: h.rol === 'modelo' ? 'model' : 'user', parts: [{ text: h.texto.slice(0, 4000) }] }));
   contents.push({ role: 'user', parts: [{ text: (suerte ? `(Estoy viendo la ficha de la suerte ${suerte}.) ` : '') + pregunta }] });
   try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent`, {
+    const llamar = () => fetch(`${API}/models/${MODELO}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: INSTRUCCIONES + (CONTEXTO || armarContexto()) }] }, contents,
         generationConfig: { temperature: 0.2, maxOutputTokens: 1500 } }),
     });
+    let r = await llamar();
+    if (r.status === 404) {
+      const otro = await elegirModelo();
+      if (otro && otro !== MODELO) { MODELO = otro; r = await llamar(); }
+    }
     const j = await r.json();
-    if (!r.ok) return fin(502, { error: 'Gemini no respondió (' + r.status + '). Intente de nuevo en un momento.' });
+    if (!r.ok) {
+      const motivo = j && j.error && j.error.message ? ': ' + String(j.error.message).slice(0, 200) : '';
+      return fin(502, { error: `Gemini no respondió (${r.status}${motivo}). Intente de nuevo en un momento.` });
+    }
     const texto = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts || []).map(p => p.text || '').join('').trim();
     return fin(200, { respuesta: texto || 'No obtuve respuesta. Intente reformular la pregunta.' });
   } catch (e) {
