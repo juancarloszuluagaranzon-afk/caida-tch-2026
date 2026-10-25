@@ -32,7 +32,7 @@ Explicamos con datos medidos por qué cayó el TCH de lo cosechado en Riopaila d
 
 - Programas: esta carpeta. Intermedios (.pkl, CSV, imágenes): `datos intermedios\` (`tablero_v3\` = salidas vigentes; `*_v2_respaldo` = versión anterior).
 - Salidas en `..\` (01 Estimados y TCH): `Caida_TCH_Riopaila_ene-sep_2026_soporte_v3.xlsx`, `Matriz ponderada Riopaila 2026 v3.xlsx`, `Validacion_modelo_caida_TCH_2026_v3.xlsx`, `Madurante_Riopaila_2026_analisis.xlsx`.
-- Informe navegable: `tablero_web\` (index.html + app.js + data/*.json + img/). Publicado en https://caida-tch-yy76h1.vercel.app (proyecto Vercel `caida-tch-yy76h1`, equipo riegos, noindex, sin Git). Se publica desde PowerShell, sin `&&`:
+- Informe navegable: `tablero_web\` (index.html + app.js + data/*.json + img/). Publicado en https://caida-tch-yy76h1.vercel.app (proyecto Vercel `caida-tch-yy76h1`, equipo riegos, noindex). Desde el 25-oct está conectado al repositorio privado `juancarloszuluagaranzon-afk/caida-tch-2026` (Root Directory `Caida TCH 2026 - programas/tablero_web`, sin compilación): cada push a `main` se publica solo. Publicar a mano, solo si hace falta, desde PowerShell, sin `&&`:
   `vercel deploy "<ruta>\tablero_web" --prod --yes --name caida-tch-yy76h1 --scope riegos`
 - En claude.ai (cuenta del usuario original; se comparten con **Share** dentro de la organización o se exportan):
   - Documento para el gerente (versión 3, con satélite y alerta 2027): https://claude.ai/artifact/9qFynjygAZ1dGXf3AuCrm6
@@ -76,5 +76,4 @@ Apoyo: `mecanica_soporte.py` (análisis de la cosecha mecanizada), `mecanica_ima
 ## Pendiente
 
 - Decidir si el madurante entra al informe y al documento (recomendación: página aparte, cc/t con PPTO, sin meterlo al modelo).
-- Subir el proyecto a un repositorio (falta decidir si público o privado; `tch-motor` es público: no subir datos por suerte sin decidirlo).
 - Conectar el Registro de NF como fuente fija y actualizar la cadena cada mes.
