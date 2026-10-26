@@ -744,7 +744,7 @@ function vGerencia() {
     <section><h3>Por qué cayó</h3>
       ${divergentes(top.map(c => ({ et: c.nombre, v: -c.t_ha })).concat([{ et: 'Sin explicar', v: -R.sin_explicar, color: 'var(--hist)' }]))}
       <p style="margin-top:8px">Por tipo de causa: ${Object.entries(grupos).sort((a, b) => a[1] - b[1]).map(([g, v]) => `<b>${g.toLowerCase()}</b> ${sg(v)} TCH`).join(' · ')}.
-        ${suman.length ? `Sumaron ${lista(suman)}: en 2026 hubo más de lo que ayuda o menos de lo que resta.` : ''}
+        ${suman.length ? `Sumaron ${lista(suman)} (entre paréntesis, por qué: en 2026 hubo menos de lo que resta o más de lo que ayuda que lo normal).` : ''}
         Las causas suman ${sg(-(R.caida - R.sin_explicar))} TCH frente a ${sg(-R.caida)} que cayó.</p>
       <p style="margin-top:10px"><b>Cuánto pesa cada causa en la caída</b> (las ${nf(R.t_caida, 0)} t que se justifican = 100 %)</p>
       ${reparto100().tabla}

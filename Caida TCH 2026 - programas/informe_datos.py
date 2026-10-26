@@ -169,6 +169,18 @@ w = S.area[ok]
 for k in CAUSAS:
     k["t_ha"] = r1(np.average(S.loc[ok, k["col"]], weights=w), 2)
 sin_exp = r1(np.average(S.loc[ok, "Sin explicar"], weights=w), 2)
+# aclaración del nombre según lo que pasó en 2026 frente a lo normal, para que se entienda por qué suma o resta
+# (un incendio no suma TCH: suma que en 2026 hubo menos que lo normal). [si sumó, si restó]
+ACLARA = {"incendio": ["menos cosechas quemadas que lo normal", "más cosechas quemadas que lo normal"],
+          "malezas": ["menos atraso del herbicida que lo normal", "más atraso del herbicida que lo normal"],
+          "roturacion": ["menos roturación tardía que lo normal", "más roturación tardía que lo normal"],
+          "fertilizacion": ["menos fertilización tardía que lo normal", "más fertilización tardía que lo normal"],
+          "riego": ["más riego que lo normal", "menos riego que lo normal"],
+          "freatico": ["nivel algo más profundo que lo normal", "nivel más alto que lo normal"],
+          "edad": ["cosechada con más edad que lo normal", "cosechada más joven que lo normal"]}
+for k in CAUSAS:
+    if k["id"] in ACLARA and k["t_ha"]:
+        k["nombre"] += f" ({ACLARA[k['id']][0 if k['t_ha'] < 0 else 1]})"
 HA, TR, TH = float(w.sum()), float(np.average(S.tch_real[ok], weights=w)), float(np.average(S.tch_hist[ok], weights=w))
 
 # ---------------------------------------------------------------- una fila por cosecha 2026 con sus datos de soporte
