@@ -167,8 +167,8 @@ function dato(id, s) {
     case 'mecanica': return s.tipo === 'Mecanizada' ? `Cosecha mecanizada${s.f ? ' el ' + fecha(s.f) : ''}` : 'Cosecha manual';
     case 'corte-anterior': return `Corte anterior: ${ANT[s.ant] || s.ant}${s.ant_f ? ` (${mesAnio(s.ant_f)}${s.ant_tch ? ', ' + nf(s.ant_tch) + ' TCH' : ''})` : ''}`;
     case 'corte-humedo': return s.mmca == null ? 'Sin dato de lluvia del corte anterior' : `${nf(s.mmca, 0)} mm de lluvia en el mes del corte anterior${s.ant_f ? ' (' + mesAnio(s.ant_f) + ')' : ''}: suelo ${s.mmca >= 100 ? 'húmedo' : 'seco'} · EMA ${s.ema}`;
-    case 'calor': return `${nf(s.d32, 0)} días >32 °C en los 30 días antes del corte (normal en ${mesN}: ${nf(s.d32n, 0)}) · EMA ${s.ema}`;
-    case 'sequia': return s.dsr == null ? 'Sin dato de riego en ese ciclo' : `Déficit sin riego ${nf(s.dsr, 0)} mm (normal en ${mesN}: ${nf(s.dsrn, 0)}); riego ${nf(s.rie, 0)} mm`;
+    case 'clima': return `${nf(s.d32, 0)} días >32 °C en los 30 días antes del corte (normal en ${mesN}: ${nf(s.d32n, 0)}); ` +
+      (s.dsr == null ? 'sin dato de agua en ese ciclo' : `falta de agua del mes 8 a la cosecha ${nf(s.dsr, 0)} mm (normal: ${nf(s.dsrn, 0)})`) + ` · EMA ${s.ema}`;
     case 'riego': return s.rie == null ? 'Sin dato de riego en ese ciclo' : `Riego aplicado ${nf(s.rie, 0)} mm (normal en ${mesN}: ${nf(s.rien, 0)}); déficit que quedó ${nf(s.def, 0)} mm`;
     case 'freatico': return s.nf == null ? 'Sin pozo de observación a menos de 1,5 km con lecturas en el ciclo' :
       `Nivel promedio del ciclo ${nf(s.nf, 2)} m; 45 días antes del corte ${nf(s.nf45, 2)} m (normal en ${mesN}: ${nf(s.nfn, 2)} m)`;
@@ -193,10 +193,8 @@ const COLS = {
     { t: 'Tipo 2026', f: s => esc(s.tipo), v: s => s.tipo }],
   'corte-humedo': [{ t: 'Corte anterior', f: s => mesAnio(s.ant_f), v: s => s.ant_f }, { t: 'Lluvia del mes (mm)', n: true, f: s => nf(s.mmca, 0), v: s => s.mmca },
     { t: 'Suelo', f: s => s.mmca == null ? '—' : (s.mmca >= 100 ? '<span class="chip mec">Húmedo</span>' : 'Seco'), v: s => s.mmca }],
-  'calor': [{ t: 'Días >32 °C', n: true, f: s => nf(s.d32, 0), v: s => s.d32 }, { t: 'Normal del mes', n: true, f: s => nf(s.d32n, 0), v: s => s.d32n },
-    { t: 'EMA', f: s => esc(s.ema), v: s => s.ema }],
-  'sequia': [{ t: 'Déficit sin riego (mm)', n: true, f: s => nf(s.dsr, 0), v: s => s.dsr }, { t: 'Normal', n: true, f: s => nf(s.dsrn, 0), v: s => s.dsrn },
-    { t: 'Riego (mm)', n: true, f: s => nf(s.rie, 0), v: s => s.rie }],
+  'clima': [{ t: 'Días >32 °C', n: true, f: s => nf(s.d32, 0), v: s => s.d32 }, { t: 'Normal', n: true, f: s => nf(s.d32n, 0), v: s => s.d32n },
+    { t: 'Falta de agua (mm)', n: true, f: s => nf(s.dsr, 0), v: s => s.dsr }, { t: 'Normal', n: true, f: s => nf(s.dsrn, 0), v: s => s.dsrn }],
   'riego': [{ t: 'Riego (mm)', n: true, f: s => nf(s.rie, 0), v: s => s.rie }, { t: 'Normal', n: true, f: s => nf(s.rien, 0), v: s => s.rien },
     { t: 'Déficit que quedó (mm)', n: true, f: s => nf(s.def, 0), v: s => s.def }],
   'freatico': [{ t: 'Nivel del ciclo (m)', n: true, f: s => nf(s.nf, 2), v: s => s.nf, asc: true }, { t: '45 días antes (m)', n: true, f: s => nf(s.nf45, 2), v: s => s.nf45, asc: true },
@@ -387,16 +385,28 @@ function soporte(id, el) {
     const x = sp.sat.map(r => r[0] + ' m');
     specs = [{ x, series: [{ tipo: 'linea', valores: sp.sat.map(r => r[1]), color: 'var(--quita)', d: 3 }, { tipo: 'linea', valores: sp.sat.map(r => r[2]), color: 'var(--mec)', dash: true, d: 3 }], yfmt: v => nf(v, 2), ejeX: 'meses de edad de la soca', alto: 210 },
       { x, series: [{ tipo: 'linea', valores: sp.sat.map(r => r[3]), color: 'var(--quita)', d: 3 }, { tipo: 'linea', valores: sp.sat.map(r => r[4]), color: 'var(--mec)', dash: true, d: 3 }], yfmt: v => nf(v, 2), ejeX: 'meses de edad de la soca', alto: 210 }];
-  } else if (id === 'calor') {
-    html = caja('Días con más de 32 °C en los 30 días antes del corte', 'Promedio de las cosechas de cada mes', leyMes) +
-      caja('Días con más de 32 °C por mes · EMA La Paila', 'Desde julio de 2024; la línea es el promedio 2011-25 de ese mes', leyenda([['var(--quita)', 'Ese mes'], ['var(--ink-2)', 'Normal', 1]]));
-    specs = [porMes('días'), { x: sp.ema.map(r => mesAnio(r[0])), series: [{ valores: sp.ema.map(r => r[1]), color: 'var(--quita)', d: 0 }, { tipo: 'linea', valores: sp.ema.map(r => r[2]), color: 'var(--ink-2)', dash: true, puntos: false }], anchoEt: 56 }];
+  } else if (id === 'clima') {
+    const ar = sp.area, pm = (m, d = 0) => ({ x: m.meses.map(r => MC[r[0] - 1]), series: [{ valores: m.meses.map(r => r[2]), color: 'var(--hist)', d }, { valores: m.meses.map(r => r[1]), color: 'var(--quita)', d }], ejeX: 'mes de cosecha' });
+    html = `<div class="pila"><h3 style="margin:0">Una sola causa: calor y sequía al final del ciclo</h3>
+      <p>Son dos condiciones del clima al cerrar el ciclo. El <b>calor</b> cuenta los días con más de 32 °C en los 30 días antes del corte: la caña transpira y respira más y pierde peso.
+        La <b>sequía</b> cuenta el agua que faltó (evaporación menos lluvia, sin contar el riego) del mes 8 a la cosecha: la caña llena menos el tallo.
+        En 2026 el calor le quitó ${sg(-sp.tch[0], 2)} TCH y la sequía ${sg(-sp.tch[1], 2)} TCH: juntas, ${sg(-(sp.tch[0] + sp.tch[1]), 2)} TCH.</p>
+      <p><b>Por qué se pueden sumar sin contar dos veces.</b> El modelo mide las dos al mismo tiempo, así que el efecto de cada una ya descuenta a la otra. Además se probó si un mes
+        caliente y seco resta más que la suma de los dos, y no (p 0,35). Lo que sí se repetía era el <b>área</b>: separadas, el calor le quitó más de 0,5 TCH a ${ar.calor[0]} cosechas
+        (${nf(ar.calor[1], 0)} ha) y la sequía a ${ar.sequia[0]} (${nf(ar.sequia[1], 0)} ha), pero ${ar.las_dos[0]} cosechas (${nf(ar.las_dos[1], 0)} ha) estaban en las dos.
+        Unidas, le quitaron más de 0,5 TCH a <b>${ar.unidas[0]} cosechas (${nf(ar.unidas[1], 0)} ha)</b> de ${ar.total[0]} (${nf(ar.total[1], 0)} ha), cada una contada una vez.</p>
+      <p class="nota" style="margin:0">El riego cubre parte de la falta de agua y va aparte, en «Riego aplicado», porque es lo que se puede manejar.</p></div>` +
+      caja('Días con más de 32 °C en los 30 días antes del corte', 'Promedio de las cosechas de cada mes', leyMes) +
+      caja('Días con más de 32 °C por mes · EMA La Paila', 'Desde julio de 2024; la línea es el promedio 2011-25 de ese mes', leyenda([['var(--quita)', 'Ese mes'], ['var(--ink-2)', 'Normal', 1]])) +
+      caja('Falta de agua sin riego del mes 8 a la cosecha (mm)', 'Promedio de las cosechas de cada mes; normal = 2022-25 (años con registro de riego)', leyMes);
+    specs = [{ ...pm(sp.calor), titulo: 'días' }, { x: sp.calor.ema.map(r => mesAnio(r[0])), series: [{ valores: sp.calor.ema.map(r => r[1]), color: 'var(--quita)', d: 0 }, { tipo: 'linea', valores: sp.calor.ema.map(r => r[2]), color: 'var(--ink-2)', dash: true, puntos: false }], anchoEt: 56 },
+      { ...pm(sp.sequia), titulo: 'mm' }];
   } else if (id === 'lluvia') {
     html = caja('Lluvia de los meses 0-3 del ciclo (mm)', 'Promedio de las cosechas de cada mes', leyMes) +
       caja('Lluvia por mes · EMA La Paila (mm)', 'Desde julio de 2024; la línea es el promedio 2011-25 de ese mes', leyenda([['var(--hist)', 'Ese mes'], ['var(--ink-2)', 'Normal', 1]]));
     specs = [porMes('mm'), { x: sp.ema.map(r => mesAnio(r[0])), series: [{ valores: sp.ema.map(r => r[1]), color: 'var(--hist)', d: 0 }, { tipo: 'linea', valores: sp.ema.map(r => r[2]), color: 'var(--ink-2)', dash: true, puntos: false }], anchoEt: 56 }];
-  } else if (id === 'sequia' || id === 'riego') {
-    html = caja(id === 'sequia' ? 'Déficit de agua sin riego al final del ciclo (mm)' : 'Lámina de riego al final del ciclo (mm)', 'Promedio de las cosechas de cada mes; normal = 2022-25 (años con registro de riego)', leyMes);
+  } else if (id === 'riego') {
+    html = caja('Lámina de riego al final del ciclo (mm)', 'Promedio de las cosechas de cada mes; normal = 2022-25 (años con registro de riego)', leyMes);
     specs = [porMes('mm')];
   } else if (id === 'freatico') {
     html = caja('Área de Riopaila con el nivel freático a menos de 1 m (ha)', 'Cada lectura quincenal de los pozos de observación, interpolada a cada suerte') +
@@ -651,7 +661,7 @@ const pctO = (r, k) => 100 * r[k] / r['o' + k];
 // peso de caña ∝ tallos × altura × diámetro² (volumen del tallo), frente al mismo producto del óptimo
 const pesoO = r => 100 * (r.pob * r.alt * r.dia ** 2) / (r.opob * r.oalt * r.odia ** 2);
 const clsO = v => Math.round(v) < 95 ? 't-q' : Math.round(v) > 105 ? 't-s' : '';   // con el valor redondeado que se muestra
-const MEDO = { pob: 'Población', alt: 'Longitud', dia: 'Diámetro', peso: 'Peso de caña' };
+const MEDO = { pob: 'Población', alt: 'Longitud', dia: 'Diámetro', peso: 'Peso de caña', kg: 'Peso por tallo' };
 const UNI = { pob: 'tallos/m', alt: 'cm', dia: 'cm' };
 
 // histórico 2023-25 contra 2026, ponderado por área: lo usan la pestaña y la explicación para la gerencia
@@ -674,18 +684,18 @@ function desarrolloHtml(enDoc) {
   const vm = (x, k, d, pk) => x[k] == null ? '—' : `<span class="${pk ? clsO(x[pk]) : ''}">${nf(x[k], d)}</span>`;
   const par = (a, b, k, d, pk) => `${vm(a, k, d, pk)} → <b>${vm(b, k, d, pk)}</b>`;
   const vari = tbl(['Variedad', 'Cosechas hist. · 2026', 'Longitud (cm)', 'Diámetro (cm)', 'Peso por tallo (kg)', 'Tallos por metro', 'Peso de caña frente al óptimo'],
-    DV.variedades.map(([v, a, b]) => [esc(v), `${a.cosechas} · ${b.cosechas}`, par(a, b, 'v_alt', 0, 'alt'), par(a, b, 'v_dia', 2, 'dia'), par(a, b, 'v_kg', 2),
+    DV.variedades.map(([v, a, b]) => [esc(v), `${a.cosechas} · ${b.cosechas}`, par(a, b, 'v_alt', 0, 'alt'), par(a, b, 'v_dia', 2, 'dia'), par(a, b, 'v_kg', 2, 'kg'),
       par(a, b, 'v_pob', 1, 'pob'), `${pc(a.peso)} → <b>${pc(b.peso)}</b>`]), [1, 2, 3, 4, 5, 6]);
-  const medido = h.v_alt == null ? '' : tbl(['Mismas suertes, valores medidos', 'Longitud (cm)', 'Diámetro (cm)', 'Peso por tallo (kg)', 'Tallos por metro'], [
-    ['Histórico 2023-25', nf(h.v_alt, 0), nf(h.v_dia, 2), nf(h.v_kg, 2), nf(h.v_pob, 1)], ['2026', nf(n.v_alt, 0), nf(n.v_dia, 2), nf(n.v_kg, 2), nf(n.v_pob, 1)],
-    ['Diferencia', dp(h.v_alt, n.v_alt), dp(h.v_dia, n.v_dia, 2), dp(h.v_kg, n.v_kg, 2), dp(h.v_pob, n.v_pob, 1)]], [1, 2, 3, 4]);
+  const medido = h.v_alt == null ? '' : tbl(['Mismas suertes, valores medidos', 'Longitud (cm)', 'Diámetro (cm)', 'Peso por tallo (kg)', 'Tallos por metro', 'Peso medido en el aforo (kg)'], [
+    ['Histórico 2023-25', nf(h.v_alt, 0), nf(h.v_dia, 2), nf(h.v_kg, 2), nf(h.v_pob, 1), nf(h.v_kgm, 2)], ['2026', nf(n.v_alt, 0), nf(n.v_dia, 2), nf(n.v_kg, 2), nf(n.v_pob, 1), nf(n.v_kgm, 2)],
+    ['Diferencia', dp(h.v_alt, n.v_alt), dp(h.v_dia, n.v_dia, 2), dp(h.v_kg, n.v_kg, 2), dp(h.v_pob, n.v_pob, 1), dp(h.v_kgm, n.v_kgm, 2)]], [1, 2, 3, 4, 5]);
   const nota = `<p class="sub" style="margin:6px 0 0">% del óptimo de cada variedad (tabla de óptimos por variedad), ponderado por el área de cada cosecha; peso de caña = tallos × longitud × diámetro².
       A cada cosecha de enero a septiembre le toca el aforo de su suerte más cercano antes del corte (unos ${DV.dias_aforo} días antes). El histórico es 2023-25: antes casi no hay
       aforos cerca del corte, y en 2023 se aforó solo una parte. No es una causa más: es el camino por el que actúan el calor, la sequía o la cosecha mecanizada,
       por eso no se suma en las causas. Con esta base, la diferencia de aforo entre corte anterior mecanizado y manual no resultó confiable.</p>`;
   return enDoc ? `${lead}${resumen}${medido ? `<p style="margin-top:8px"><b>Valores medidos</b> (ponderados por área)</p>${medido}` : ''}<p style="margin-top:8px"><b>Por variedad</b> (las de más área en 2026; valores medidos ponderados por área, histórico → 2026)</p>${vari}${nota}`
     : `${lead}<div class="caja"><h3>Histórico 2023-25 contra 2026</h3>${resumen}${medido ? `<p class="sub" style="margin:12px 0 6px">Lo mismo en valores medidos, ponderados por el área de cada cosecha:</p>${medido}` : ''}</div><div class="caja"><h3>Por variedad</h3>
-       <p class="sub" style="margin-bottom:8px">Las de más área en 2026. Valores medidos en el aforo, ponderados por el área de cada cosecha: histórico 2023-25 → 2026. Longitud = altura del tallo; peso por tallo = peso de los 10 tallos del aforo ÷ 10. Rojo: más de 5 % por debajo del óptimo de la variedad.</p>${vari}</div><div class="nota">${nota.replace('class="sub" ', '')}</div>`;
+       <p class="sub" style="margin-bottom:8px">Las de más área en 2026. Valores medidos en el aforo, ponderados por el área de cada cosecha: histórico 2023-25 → 2026. Longitud = altura del tallo; peso por tallo = π × (diámetro ÷ 2)² × longitud × 1,04 (densidad) ÷ 1000, en kg; el del óptimo con la misma fórmula. Rojo: más de 5 % por debajo del óptimo de la variedad.</p>${vari}</div><div class="nota">${nota.replace('class="sub" ', '')}</div>`;
 }
 
 function vDesarrollo() {
@@ -696,7 +706,7 @@ function vDesarrollo() {
   $app.innerHTML = `<div class="pila">
     <div><h2>¿La caña de 2026 llegó con menos desarrollo que en su historia?</h2>
       <p class="sub">Aforo antes de la cosecha frente al óptimo de cada variedad, ponderado por área: las mismas ${M.suertes} suertes en 2023-25 y en 2026.</p></div>
-    <div class="kpis">${['peso', 'alt', 'pob', 'dia'].map(kpi).join('')}</div>
+    <div class="kpis">${['peso', 'kg', 'alt', 'pob', 'dia'].map(kpi).join('')}</div>
     ${desarrolloHtml(false)}</div>`;
 }
 
@@ -710,7 +720,8 @@ function afoFicha(s) {
     <p class="sub" style="margin-bottom:8px">Aforo de la caña en pie antes de la cosecha. Rojo: más de 5 % por debajo del óptimo.</p>
     <div class="tabla"><table><thead><tr><th>Medida</th><th class="n">Aforo</th><th class="n">Óptimo</th><th class="n">% del óptimo</th></tr></thead><tbody>
       ${fila('pob')}${fila('alt')}${fila('dia')}
-      ${r.kg != null ? `<tr><td>Peso por tallo (kg)</td><td class="n">${nf(r.kg, 2)}</td><td class="n">—</td><td></td></tr>` : ''}
+      ${r.kg != null ? `<tr><td>Peso por tallo (kg) · π × (diámetro ÷ 2)² × longitud × 1,04 ÷ 1000</td><td class="n">${nf(r.kg, 2)}</td><td class="n">${nf(r.okg, 2)}</td><td class="n"><b class="${clsO(100 * r.kg / r.okg)}">${nf(100 * r.kg / r.okg, 0)} %</b></td></tr>` : ''}
+      ${r.kgm != null ? `<tr><td>Peso medido en el aforo (10 tallos ÷ 10, kg)</td><td class="n">${nf(r.kgm, 2)}</td><td class="n">—</td><td></td></tr>` : ''}
       <tr><td><b>Peso de caña</b> (tallos × longitud × diámetro²)</td><td></td><td></td><td class="n"><b class="${clsO(pesoO(r))}">${nf(pesoO(r), 0)} %</b></td></tr>
     </tbody></table></div><p class="sub" style="margin:6px 0 0"><a href="#desarrollo">Ver el histórico contra 2026 por variedad</a></p></div>`;
 }
@@ -735,7 +746,7 @@ function suelosHtml(enDoc) {
       .concat(SU.sin_dato ? [['Sin dato', 'La suerte no está en el estudio de suelos', SU.sin_dato[0], nf(SU.sin_dato[1], 0), nf(SU.sin_dato[2]) + ' %', '', '', '', '', '', '']] : []),
     [2, 3, 4, 6, 7, 8, 9, 10]);
   const CQ = [['cosecha mecanizada', 'Cosecha mecanizada'], ['corte anterior mecanizado', 'Corte anterior mecanizado'], ['suelo húmedo', 'Cosecha con suelo húmedo'],
-    ['sequía', 'Sequía al final del ciclo'], ['riego', 'Riego aplicado'], ['nivel freático', 'Nivel freático']];
+    ['calor y sequía', 'Calor y sequía al final del ciclo'], ['riego', 'Riego aplicado'], ['nivel freático', 'Nivel freático']];
   const t2 = tbl(['Lo que le quitó o sumó (TCH)', ...G.map(g => g.g)],
     CQ.map(([k, et]) => [et, ...G.map(g => `<span class="${clsImp(g.quito[k])}">${sg(g.quito[k])}</span>`)])
       .concat([['% del área con cosecha mecanizada', ...G.map(g => nf(g.mec, 0) + ' %')]]), G.map((_, i) => i + 1));
@@ -848,8 +859,9 @@ function vGerencia() {
   const chA = C.soporte['corte-humedo'];
   const humHa2425 = chA && chA.ha ? (chA.ha.filter(r => r[0] === 2024 || r[0] === 2025).reduce((x, r) => x + r[1], 0) / 2) : null;
   const clima = [
-    ['Días con más de 32 °C en los 30 días antes del corte', nf(wS('d32')), nf(wS('d32n')), ap('calor')],
-    ['Déficit de agua sin riego al final del ciclo (mm)', nf(wS('dsr'), 0), nf(wS('dsrn'), 0), ap('sequia')],
+    ['Calor: días con más de 32 °C en los 30 días antes del corte', nf(wS('d32')), nf(wS('d32n')), ''],
+    ['Sequía: falta de agua sin riego del mes 8 a la cosecha (mm)', nf(wS('dsr'), 0), nf(wS('dsrn'), 0), ''],
+    ['<b>Calor y sequía al final del ciclo (una causa)</b>', '', '', ap('clima')],
     ['Riego aplicado al final del ciclo (mm)', nf(wS('rie'), 0), nf(wS('rien'), 0), ap('riego')],
     ['Lluvia de los meses 0-3 del ciclo (mm)', nf(wS('llu'), 0), nf(wS('llun'), 0), ap('lluvia')],
     ['Nivel freático promedio del ciclo (m)', nf(wS('nf'), 2), nf(wS('nfn'), 2), ap('freatico')],
@@ -931,12 +943,12 @@ function vGerencia() {
       ${suelosHtml(true)}</section>` : ''}
 
     <section><h3>Clima, agua y nivel freático</h3>
-      <p>Entre calor y sequía, el clima de 2026 quitó ${sg(-(causa('calor').t_ha + causa('sequia').t_ha))} TCH; el riego devolvió ${ap('riego')}.
+      <p>Calor y sequía al final del ciclo, una sola causa, quitaron ${ap('clima')} TCH; el riego devolvió ${ap('riego')}.
         Cada suerte se compara con lo normal de su mes de cosecha.</p>
       ${tb(['Variable', '2026', 'Normal', 'Aporte (TCH)'], clima.map(r => [r[0], `<b>${r[1]}</b>`, r[2], `<b class="${clsImp(parseFloat(String(r[3]).replace('−', '-').replace(',', '.')))}">${r[3]}</b>`]), [1, 2, 3])}
-      <p style="margin-top:10px"><b>Calor y sequía no son lo mismo.</b> El calor cuenta los días con más de 32 °C en los 30 días antes del corte: la caña transpira y respira más,
+      <p style="margin-top:10px"><b>Por qué van juntas.</b> El calor cuenta los días con más de 32 °C en los 30 días antes del corte: la caña transpira y respira más,
         pierde agua y peso, y no se compensa. La sequía cuenta el agua que faltó (evaporación menos lluvia) del mes 8 del ciclo a la cosecha: con poca agua la caña llena
-        menos el tallo, y el riego lo compensa en parte. Las dos entran juntas en el modelo, así que un mes caliente y seco no se cuenta dos veces.
+        menos el tallo, y el riego lo compensa en parte. Las dos entran juntas en el modelo, así que un mes caliente y seco no se cuenta dos veces, y probada la combinación no resta más que la suma (p 0,35); por eso se muestran como una sola causa${causa('clima') && C.soporte.clima ? `, que le quitó más de 0,5 TCH a ${C.soporte.clima.area.unidas[0]} cosechas (${nf(C.soporte.clima.area.unidas[1], 0)} ha), cada una contada una vez` : ''}.
         Algo de estrés de agua al final se busca a propósito para madurar la caña; en 2026 el déficit fue mucho mayor que lo normal y eso ya resta.</p>
       <p><b>Nivel freático.</b> Medido en los 202 pozos del Registro de NF de Ingeniería Agrícola (lecturas cada 15 días), llevado a cada suerte. En promedio fue parecido
         a lo normal, pero ${nf(haArea(s => s.nf != null && s.nf < 1), 0)} ha cosechadas tuvieron el agua a menos de 1 m y ahí sí resta.</p>

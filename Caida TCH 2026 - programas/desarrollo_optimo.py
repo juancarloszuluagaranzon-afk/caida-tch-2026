@@ -8,7 +8,8 @@ Entradas:
   · rio_integrado_dataset.pkl (caida_integrada_rio.py): las cosechas con su área, TCH y corte anterior.
 A cada cosecha de enero a septiembre le toca el aforo de su suerte más cercano antes del corte (9 meses de edad o más, hasta
 150 días antes y 15 después), promedio de sus tablones. Cada medida como % del óptimo de la variedad aforada; peso de caña =
-tallos × altura × diámetro² frente al mismo producto del óptimo. Promedios ponderados por el área de la cosecha.
+tallos × altura × diámetro² frente al mismo producto del óptimo; peso por tallo (kg) = π × (diámetro/2)² × longitud ×
+1,04 / 1000, también para el óptimo (el peso medido de los 10 tallos ÷ 10 queda aparte). Promedios ponderados por el área de la cosecha.
 Comparación: histórico 2023-25 (2022 casi no tiene aforos cerca del corte) contra 2026, con todas las cosechas y con las mismas
 suertes (las que tienen aforo en los dos periodos). Sin nombres de personas en la salida.
 
@@ -77,16 +78,21 @@ x = h[h.af_pob.notna()].merge(o, left_on="af_var", right_on="var", how="inner")
 for k in ["pob", "alt", "dia"]:
     x["p_" + k] = 100 * x["af_" + k].astype(float) / x["o" + k]
 x["p_peso"] = 100 * (x.af_pob * x.af_alt * x.af_dia ** 2).astype(float) / (x.opob * x.oalt * x.odia ** 2)
+# peso por tallo (kg) = volumen del tallo × densidad: π × (diámetro/2)² × longitud × 1,04 / 1000 (cm, g/cm³); igual para el óptimo
+PESO = lambda dia, alt: np.pi * (dia.astype(float) / 2) ** 2 * alt.astype(float) * 1.04 / 1000  # noqa: E731
+x["kg_f"], x["okg"] = PESO(x.af_dia, x.af_alt), PESO(x.odia, x.oalt)
+x["p_kg"] = 100 * x.kg_f / x.okg
 x = x[x.anio >= 2023].copy()
 x["per"] = np.where(x.anio == 2026, "2026", "hist")
 print("cosechas con aforo y óptimo por año:", x.groupby("anio").size().to_dict())
 
-K = ["pob", "alt", "dia", "peso"]
+K = ["pob", "alt", "dia", "peso", "kg"]
 w = lambda L, k: float(np.average(L[k], weights=L.Area)) if len(L) else None  # noqa: E731
 wv = lambda L, k: float(np.average(L[k].dropna().astype(float), weights=L.Area[L[k].notna()])) if L[k].notna().any() else None  # noqa: E731
 # % del óptimo y, aparte, los valores medidos ponderados por área: longitud (cm), diámetro (cm), tallos/m y peso por tallo (kg)
 res = lambda L: {"cosechas": int(len(L)), "ha": r1(L.Area.sum(), 0), **{k: r1(w(L, "p_" + k)) for k in K}, "tch": r1(w(L, "tch_calc")),  # noqa: E731
-                 "v_alt": r1(wv(L, "af_alt"), 0), "v_dia": r1(wv(L, "af_dia"), 2), "v_pob": r1(wv(L, "af_pob"), 1), "v_kg": r1(wv(L, "af_kg"), 2)}
+                 "v_alt": r1(wv(L, "af_alt"), 0), "v_dia": r1(wv(L, "af_dia"), 2), "v_pob": r1(wv(L, "af_pob"), 1), "v_kg": r1(wv(L, "kg_f"), 2),
+                 "v_kgm": r1(wv(L, "af_kg"), 2)}   # v_kg = fórmula; v_kgm = peso medido de los 10 tallos ÷ 10
 both = sorted(set(x[x.per == "2026"].ste) & set(x[x.per == "hist"].ste))
 y = x[x.ste.isin(both)]
 top = x[x.per == "2026"].groupby("af_var").Area.sum().sort_values(ascending=False).index[:8]
@@ -98,28 +104,30 @@ out = {"todas": {p: res(x[x.per == p]) for p in ("hist", "2026")},
        "optimo": [[r.var, r1(r.oalt), r1(r.odia, 2), r1(r.opob, 2)] for r in o.itertuples()],
        # 2026 por cosecha, para la ficha de cada suerte
        "filas": [{"s": r.ste, "m": int(r.Mes), "v": r.af_var, "alt": r1(r.af_alt), "oalt": r1(r.oalt), "pob": r1(r.af_pob, 2),
-                  "opob": r1(r.opob, 2), "dia": r1(r.af_dia, 2), "odia": r1(r.odia, 2), "kg": r1(r.af_kg, 2)} for r in x[x.per == "2026"].itertuples()]}
+                  "opob": r1(r.opob, 2), "dia": r1(r.af_dia, 2), "odia": r1(r.odia, 2), "kg": r1(r.kg_f, 2), "okg": r1(r.okg, 2), "kgm": r1(r.af_kg, 2)} for r in x[x.per == "2026"].itertuples()]}
 for p, et in (("hist", "Histórico 2023-25"), ("2026", "2026")):
     print(f"{et}: todas {out['todas'][p]} | mismas {out['mismas'][p]}")
 
 # ---------------------------------------------------------------- salida
 NOM = {"cosechas": "Cosechas", "ha": "Área (ha)", "pob": "Población % del óptimo", "alt": "Altura % del óptimo",
        "dia": "Diámetro % del óptimo", "peso": "Peso de caña % del óptimo", "tch": "TCH",
-       "v_alt": "Longitud (cm)", "v_dia": "Diámetro (cm)", "v_pob": "Tallos/m", "v_kg": "Peso por tallo (kg)"}
+       "v_alt": "Longitud (cm)", "v_dia": "Diámetro (cm)", "v_pob": "Tallos/m", "v_kg": "Peso por tallo (kg, fórmula)", "v_kgm": "Peso por tallo medido (kg)",
+       "kg": "Peso por tallo % del óptimo"}
 tab = lambda d: pd.DataFrame(d).T.rename(columns=NOM).rename(index={"hist": "Histórico 2023-25"})  # noqa: E731
 col = x[["ste", "anio", "Mes", "Area", "tch_calc", "af_fecha", "af_var", "af_pob", "opob", "p_pob", "af_alt", "oalt", "p_alt",
-         "af_dia", "odia", "p_dia", "af_kg", "p_peso"]].rename(columns={"ste": "Suerte", "anio": "Año", "Mes": "Mes", "Area": "Área (ha)",
+         "af_dia", "odia", "p_dia", "kg_f", "okg", "p_kg", "af_kg", "p_peso"]].rename(columns={"ste": "Suerte", "anio": "Año", "Mes": "Mes", "Area": "Área (ha)",
          "tch_calc": "TCH", "af_fecha": "Fecha aforo", "af_var": "Variedad aforo", "af_pob": "Tallos/m", "opob": "Tallos/m óptimo",
          "p_pob": "Población %", "af_alt": "Altura (cm)", "oalt": "Altura óptima", "p_alt": "Altura %", "af_dia": "Diámetro (cm)",
-         "odia": "Diámetro óptimo", "p_dia": "Diámetro %", "af_kg": "Peso por tallo (kg)", "p_peso": "Peso de caña %"})
+         "odia": "Diámetro óptimo", "p_dia": "Diámetro %", "kg_f": "Peso por tallo (kg, fórmula)", "okg": "Peso por tallo óptimo (kg)", "p_kg": "Peso por tallo %",
+         "af_kg": "Peso por tallo medido (kg)", "p_peso": "Peso de caña %"})
 with pd.ExcelWriter(OUT) as wr:
     tab(out["todas"]).to_excel(wr, sheet_name="Todas las cosechas")
     tab({k: v for k, v in out["mismas"].items() if k != "suertes"}).to_excel(wr, sheet_name="Mismas suertes")
     pd.DataFrame({a: v for a, v in out["anios"]}).T.rename(columns=NOM).to_excel(wr, sheet_name="Por año")
-    pd.DataFrame([{"Variedad": v, **{f"{NOM[k]} {p}": d[k] for p, d in (("histórico", hh), ("2026", nn)) for k in ["cosechas", "v_alt", "v_dia", "v_pob", "v_kg", "pob", "alt", "dia", "peso"]}}
+    pd.DataFrame([{"Variedad": v, **{f"{NOM[k]} {p}": d[k] for p, d in (("histórico", hh), ("2026", nn)) for k in ["cosechas", "v_alt", "v_dia", "v_pob", "v_kg", "v_kgm", "pob", "alt", "dia", "kg", "peso"]}}
                   for v, hh, nn in out["variedades"]]).to_excel(wr, sheet_name="Por variedad", index=False)
     col.round(2).to_excel(wr, sheet_name="Cosechas con aforo", index=False)
-    o.rename(columns={"var": "Variedad", "oalt": "Altura (cm)", "odia": "Diámetro (cm)", "opob": "Tallos/m"}).to_excel(wr, sheet_name="Óptimo por variedad", index=False)
+    o.assign(okg=PESO(o.odia, o.oalt)).rename(columns={"var": "Variedad", "oalt": "Altura (cm)", "odia": "Diámetro (cm)", "opob": "Tallos/m", "okg": "Peso por tallo (kg)"}).to_excel(wr, sheet_name="Óptimo por variedad", index=False)
 print("escrito:", OUT)
 if WEB:
     json.dump(out, open(WEB / "data" / "desarrollo.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))

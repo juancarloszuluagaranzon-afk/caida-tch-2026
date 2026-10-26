@@ -99,7 +99,7 @@ def g26(g):
            "caída TCH": w(g, "real") - w(g, "hist"), "t perdidas": float(((g["real"] - g["hist"]) * g.a).sum()),
            "PPTO": w(g.dropna(subset=["ppto"]), "ppto"), "% cosecha mecanizada": 100 * float(np.average(g.tipo == "Mecanizada", weights=g.a))}
     for k, et in (("mecanica", "cosecha mecanizada"), ("corte-humedo", "suelo húmedo"), ("freatico", "nivel freático"),
-                  ("sequia", "sequía"), ("riego", "riego"), ("corte-anterior", "corte anterior mecanizado")):
+                  ("clima", "calor y sequía"), ("riego", "riego"), ("corte-anterior", "corte anterior mecanizado")):
         out[f"le quitó: {et}"] = -float(np.average(a[k].fillna(0), weights=g.a))
     out["sin explicar"] = -float(np.average(g.se.fillna(0), weights=g.a))
     return pd.Series(out)
@@ -146,7 +146,7 @@ for g in GR:
                    "hist2025": r1(t.get("TCH 2020-25")), "historia": r1(t.get("historia")), "real": r1(t.get("real 2026")),
                    "caida": r1(t.get("caída TCH")), "t": r1(t.get("t perdidas"), 0), "ppto": r1(t.get("PPTO")),
                    "mec": r1(t.get("% cosecha mecanizada"), 0), "n26": int(t.get("cosechas 2026", 0) or 0),
-                   "quito": {k: r1(t.get("le quitó: " + k)) for k in ["cosecha mecanizada", "suelo húmedo", "nivel freático", "sequía", "riego", "corte anterior mecanizado"]},
+                   "quito": {k: r1(t.get("le quitó: " + k)) for k in ["cosecha mecanizada", "suelo húmedo", "nivel freático", "calor y sequía", "riego", "corte anterior mecanizado"]},
                    "se": r1(t.get("sin explicar"))})
 sd = a26.loc["sin dato"] if "sin dato" in a26.index else None
 out = {"grupos": grupos, "sin_dato": None if sd is None else [int(sd.cosechas), r1(sd.ha, 0), r1(sd["%"])],

@@ -68,6 +68,9 @@ q = ds.loc[x.index].copy()
 q["clave"] = x.clave
 S = S.set_index("clave").loc[q.clave].reset_index()
 S.index = q.index
+# calor y sequía, una sola causa (26-oct, pedido del jefe): se miden juntas en el modelo y sus aportes se suman sin traslaparse
+CAL_C, SEQ_C = "Días Tmax >32 °C", "Balance hídrico: sequía al final"
+S["Calor y sequía al final del ciclo"] = S[CAL_C] + S[SEQ_C]
 ref = ds[ds.anio.between(2020, 2025) & ds.Mes.between(1, 9)]
 # el informe da los efectos en TCH: % del modelo × un TCH base (el % queda entre paréntesis)
 TN = float(np.average(ref.tch_calc, weights=ref.Area))   # TCH normal 2020-25 de Riopaila, enero a septiembre
@@ -116,12 +119,13 @@ CAUSAS = [
              "cepa queda más golpeada y la soca rebrota menos; se toma como húmedo un mes con 100 mm o más.",
      "efecto": f"Por cada 100 mm de lluvia en el mes del corte anterior: {tc(coef.loc['ca_mm100', 'efecto %'])} "
                f"({ep(coef.loc['ca_mm100', 'p'])}). La diferencia entre corte manual y mecanizado no fue confiable."},
-    {"id": "calor", "nombre": "Temperatura mayor a 32 °C 30 días antes de cosecha", "col": "Días Tmax >32 °C", "grupo": "No controlable",
-     "mide": "Días con temperatura máxima por encima de 32 °C en los 30 días antes del corte (EMA La Paila o Bugalagrande).",
-     "efecto": f"Cada día por encima de 32 °C: {tc(coef.loc['d32', 'efecto %'], d=2)}."},
-    {"id": "sequia", "nombre": "Sequía al final del ciclo", "col": "Balance hídrico: sequía al final", "grupo": "No controlable",
-     "mide": "Balance hídrico de los últimos meses del ciclo: evaporación menos lluvia (déficit sin riego, mm).",
-     "efecto": f"Cada 100 mm de déficit que queda después del riego: {tc(coef.loc['def100', 'efecto %'])}."},
+    {"id": "clima", "nombre": "Calor y sequía al final del ciclo", "col": "Calor y sequía al final del ciclo", "grupo": "No controlable",
+     "mide": "Las dos condiciones del clima al cerrar el ciclo, en una sola causa: los días con más de 32 °C en los 30 días antes del "
+             "corte y la falta de agua (evaporación menos lluvia, sin contar el riego) del mes 8 a la cosecha, en la EMA de la suerte. "
+             "Se miden juntas en el modelo, así que un mes caliente y seco no se cuenta dos veces.",
+     "efecto": f"Cada día por encima de 32 °C: {tc(coef.loc['d32', 'efecto %'], d=2)}; cada 100 mm de falta de agua: "
+               f"{tc(coef.loc['def100', 'efecto %'])}. Los dos efectos se suman: probada la combinación, un mes caliente y seco no "
+               "resta más que la suma de los dos (p 0,35). El riego, que cubre parte de esa falta de agua, va aparte en «Riego aplicado»."},
     {"id": "riego", "nombre": "Riego aplicado", "col": "Balance hídrico: riego aplicado", "grupo": "Flujo de caja",
      "mide": "Lámina de riego aplicada al final del ciclo (mm), que reduce el déficit.",
      "efecto": f"Cada 100 mm de riego evitan perder {es(-coef.loc['def100', 'efecto %'] / 100 * TN)[1:]} TCH ({es(-coef.loc['def100', 'efecto %'])[1:]} %; mismo coeficiente del déficit)."},
@@ -406,6 +410,13 @@ sop["lluvia"]["ema"] = [[f.strftime("%Y-%m"), r1(LLM["La Paila"].get(f), 0), r1(
                         for f in pd.date_range("2024-07-01", "2026-09-01", freq="MS")]
 sop["calor"]["ema"] = [[f.strftime("%Y-%m"), r1(CAL["La Paila"].get(f), 0), r1(NCA["La Paila"].get(f.month), 1)]
                        for f in pd.date_range("2024-07-01", "2026-09-01", freq="MS")]
+_okc = S.tch_real.notna() & S.tch_hist.notna()
+_c, _s, _a = S.loc[_okc, CAL_C], S.loc[_okc, SEQ_C], S.loc[_okc, "area"]
+_area = lambda m: [int(m.sum()), r1(_a[m].sum(), 0)]  # noqa: E731
+sop["clima"] = {"calor": sop.pop("calor"), "sequia": sop.pop("sequia"),
+                "tch": [r1(np.average(_c, weights=_a), 2), r1(np.average(_s, weights=_a), 2)],
+                "area": {"calor": _area(_c > 0.5), "sequia": _area(_s > 0.5), "las_dos": _area((_c > 0.5) & (_s > 0.5)),
+                         "unidas": _area(_c + _s > 0.5), "total": _area(_c.notna())}}
 s26 = q.groupby("var").Area.sum() / q.Area.sum()
 sR = ref.groupby("var").Area.sum() / ref.Area.sum()
 # área en ha: 2026 tal cual; «normal» = el abanico varietal de 2020-25 llevado al área cosechada en 2026 (mismo total, se compara el abanico)
