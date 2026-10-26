@@ -829,6 +829,27 @@ function vSuelos() {
     ymin: 80, yfmt: v => nf(v, 0) });
 }
 
+// qué tipo de análisis es: la regresión, cómo se lee un efecto y qué no demuestra (Método y fuentes y Para la gerencia)
+function regresionHtml() {
+  const ca = C.causas.find(c => c.id === 'corte-anterior');
+  return `<p><b>Es una regresión.</b> Una regresión lineal múltiple con efectos fijos, sobre datos de panel: las mismas suertes medidas año tras año.
+      Explica el TCH de cada cosecha (en logaritmo, por eso cada efecto sale en %) con 7.433 cosechas de Riopaila de 2011 a 2026.</p>
+    <ul style="margin:6px 0;padding-left:20px">
+      <li><b>Cada suerte frente a sí misma</b> (efecto fijo de suerte): cada suerte tiene su propio nivel, así que una suerte buena no se mezcla con una mala.</li>
+      <li><b>Año y mes de cosecha</b> (efectos fijos): descuentan lo que le pasó a todo Riopaila ese año y la época de corte.</li>
+      <li><b>Todas las causas juntas:</b> edad, número de corte y etapa de la soca, variedad, incendio, cosecha mecanizada, corte anterior mecanizado, calor, falta de agua y riego,
+        lluvia, nivel freático, labores y renovación entran al mismo tiempo; el efecto de cada una ya descuenta a las demás, por eso no se cuentan dos veces.</li>
+      <li><b>Ponderada por área:</b> una suerte de 10 ha pesa más que una de 2 ha. <b>Errores agrupados por suerte:</b> el p-valor tiene en cuenta que las cosechas de una misma suerte se parecen.</li>
+    </ul>
+    <p><b>Del efecto al aporte.</b> Aporte de una causa en una suerte = efecto × (su nivel en 2026 − el nivel normal). Los aportes de todas las causas más lo «sin explicar»
+      suman exacto la caída de la suerte. El efecto en % se pasa a TCH con el TCH normal 2020-25 de Riopaila (${nf(C.tch_base || 118.4)} TCH).</p>
+    ${ca ? `<p><b>Ejemplo: corte anterior mecanizado.</b> ${esc(ca.efecto)} En 2026 hubo más área que salía de un corte mecanizado que lo normal; por eso esta causa
+      le quitó ${sg(-ca.t_ha, 2)} TCH a la caída.</p>` : ''}
+    <p class="nota" style="margin:6px 0 0"><b>Qué tan confiable es.</b> Se probó prediciendo 2026 sin haberlo visto (pestaña «Prueba del modelo»): acierta el promedio y los grupos,
+      pero suerte por suerte explica poco (R² de 0,21 a 0,29). Es una asociación medida con muchos años y suertes, no un experimento: dice cuánto se mueve el TCH
+      cuando cambia cada causa, descontando las demás, pero no reemplaza una prueba de campo.</p>`;
+}
+
 // ---------------------------------------------------------------- vista: explicación para la gerencia (documento completo, se descarga en PDF)
 // Las cifras salen de los mismos datos del informe; las de análisis aparte (alerta 2027 en t) se citan del soporte.
 function vGerencia() {
@@ -905,6 +926,8 @@ function vGerencia() {
       <p style="margin-top:10px"><b>Cuánto pesa cada causa en la caída</b> (las ${nf(R.t_caida, 0)} t que se justifican = 100 %)</p>
       ${reparto100().tabla}
       <p class="sub" style="margin:6px 0 0">Las causas que restaron suman más del 100 % y las que sumaron TCH (con % negativo) lo compensan; con lo «sin explicar», el total da exacto el 100 %.</p></section>
+
+    <section><h3>Qué tipo de análisis es</h3>${regresionHtml()}</section>
 
     <section><h3>Qué se midió en cada causa</h3>
       <p>Cada causa es un dato medido en campo, en estaciones o por satélite, y su peso sale de 7.433 cosechas de Riopaila de 2011 a 2026, comparando cada suerte
@@ -1195,9 +1218,7 @@ function vMetodo() {
     <div class="caja"><h3>Qué se compara</h3><p>Cada suerte cosechada entre enero y septiembre de 2026 frente a su propio promedio de 2020-25
       (media geométrica). Así no se mezcla una suerte buena con una mala: la caída es de la misma suerte contra sí misma.
       El PPTO es el TCH PPTO del Maestro de Suertes 2026 (columna AG), por suerte.</p></div>
-    <div class="caja"><h3>El modelo</h3><p>Una regresión del logaritmo del TCH sobre 7.433 cosechas de Riopaila de 2011 a 2026, ponderada por área,
-      con un efecto fijo para cada suerte (su nivel propio), para cada año y para cada mes de cosecha. Sobre eso, cada variable medida tiene su efecto.
-      El aporte de una causa en una suerte = efecto × (su nivel en 2026 − el nivel normal). Los aportes de todas las causas más lo «sin explicar» suman exacto la caída de la suerte.</p></div>
+    <div class="caja"><h3>Qué tipo de análisis es</h3>${regresionHtml()}</div>
     <div class="caja"><h3>Variables y fuentes</h3><div class="tabla"><table><thead><tr><th>Variable</th><th>Fuente</th><th>Desde</th></tr></thead><tbody>
       <tr><td>TCH, tipo de cosecha, corte, edad, variedad</td><td>ZQM histórico + G&amp;P 2026</td><td>2011</td></tr>
       <tr><td>Corte anterior mecanizado</td><td>El corte anterior de la misma suerte en el ZQM</td><td>2012</td></tr>
