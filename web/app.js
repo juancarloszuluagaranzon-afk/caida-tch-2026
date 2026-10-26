@@ -545,6 +545,21 @@ function ejemplo() {
     <div id="ej-tabla"></div></div>`;
 }
 
+// el 100 % es la caída que se justifica (toneladas); las causas que sumaron TCH entran con % negativo.
+// Lo usan la página de cada causa y la explicación para la gerencia.
+function reparto100(actualId) {
+  const tq = x => x.t_ha * R.ha, tSE = R.sin_explicar * R.ha;
+  const base = C.causas.reduce((a, x) => a + tq(x), 0) + tSE, pc = t => 100 * t / base;
+  const pcT = v => (v < -0.04 ? '−' : '') + nf(Math.abs(v), 1);
+  const filas = [...C.causas].sort((a, b) => tq(b) - tq(a)).map(x => `<tr${x.id === actualId ? ' class="actual"' : ''}><td>${actualId === undefined ? esc(x.nombre) : `<a href="#causa/${x.id}">${esc(x.nombre)}</a>`}</td>
+      <td class="n ${clsImp(-x.t_ha)}">${sg(-x.t_ha)}</td><td class="n">${sg(-tq(x), 0)}</td><td class="n"><b>${pcT(pc(tq(x)))} %</b></td></tr>`).join('') +
+    `<tr><td>Sin explicar</td><td class="n">${sg(-R.sin_explicar)}</td><td class="n">${sg(-tSE, 0)}</td><td class="n"><b>${pcT(pc(tSE))} %</b></td></tr>
+     <tr class="total"><td><b>Caída que se justifica</b></td><td class="n"><b>${sg(-R.caida)}</b></td><td class="n"><b>${sg(-R.t_caida, 0)}</b></td><td class="n"><b>100 %</b></td></tr>`;
+  const actual = C.causas.find(x => x.id === actualId);
+  return { pc: actual ? pc(tq(actual)) : null, filas,
+    tabla: `<div class="tabla reparto"><table><thead><tr><th>Causa</th><th class="n">TCH</th><th class="n">Toneladas</th><th class="n">% de la caída</th></tr></thead><tbody>${filas}</tbody></table></div>` };
+}
+
 function vCausa(id) {
   const c = C.causas.find(x => x.id === id) || C.causas[0];
   const grupos = ['No controlable', 'Agronómico y operativo', 'Flujo de caja'];
@@ -553,15 +568,7 @@ function vCausa(id) {
   const conH = S.filter(s => s.hist != null);
   const mx = Math.max(0.5, ...conH.map(s => Math.abs(s.ap[c.id] || 0)));
   const nAf = conH.filter(s => (s.ap[c.id] || 0) > 0.5).length, nFa = conH.filter(s => (s.ap[c.id] || 0) < -0.5).length;
-  // el 100 % es la caída que se justifica (toneladas); las causas que sumaron TCH entran con % negativo
-  const tq = x => x.t_ha * R.ha, tSE = R.sin_explicar * R.ha;
-  const base = C.causas.reduce((a, x) => a + tq(x), 0) + tSE, pc = t => 100 * t / base;
-  const pcT = v => (v < -0.04 ? '−' : '') + nf(Math.abs(v), 1);
-  const pcC = pc(tq(c));
-  const reparto = [...C.causas].sort((a, b) => tq(b) - tq(a)).map(x => `<tr${x.id === c.id ? ' class="actual"' : ''}><td><a href="#causa/${x.id}">${esc(x.nombre)}</a></td>
-      <td class="n ${clsImp(-x.t_ha)}">${sg(-x.t_ha)}</td><td class="n">${sg(-tq(x), 0)}</td><td class="n"><b>${pcT(pc(tq(x)))} %</b></td></tr>`).join('') +
-    `<tr><td>Sin explicar</td><td class="n">${sg(-R.sin_explicar)}</td><td class="n">${sg(-tSE, 0)}</td><td class="n"><b>${pcT(pc(tSE))} %</b></td></tr>
-     <tr class="total"><td><b>Caída que se justifica</b></td><td class="n"><b>${sg(-R.caida)}</b></td><td class="n"><b>${sg(-R.t_caida, 0)}</b></td><td class="n"><b>100 %</b></td></tr>`;
+  const { pc: pcC, filas: reparto } = reparto100(c.id);
   $app.innerHTML = `<div class="causas"><nav class="lista-causas" aria-label="Causas">${lista}</nav>
     <section class="pila">
       <div class="caja"><span class="chip">${esc(c.grupo)}</span>
@@ -738,7 +745,10 @@ function vGerencia() {
       ${divergentes(top.map(c => ({ et: c.nombre, v: -c.t_ha })).concat([{ et: 'Sin explicar', v: -R.sin_explicar, color: 'var(--hist)' }]))}
       <p style="margin-top:8px">Por tipo de causa: ${Object.entries(grupos).sort((a, b) => a[1] - b[1]).map(([g, v]) => `<b>${g.toLowerCase()}</b> ${sg(v)} TCH`).join(' · ')}.
         ${suman.length ? `Sumaron ${lista(suman)}: en 2026 hubo más de lo que ayuda o menos de lo que resta.` : ''}
-        Las causas suman ${sg(-(R.caida - R.sin_explicar))} TCH frente a ${sg(-R.caida)} que cayó.</p></section>
+        Las causas suman ${sg(-(R.caida - R.sin_explicar))} TCH frente a ${sg(-R.caida)} que cayó.</p>
+      <p style="margin-top:10px"><b>Cuánto pesa cada causa en la caída</b> (las ${nf(R.t_caida, 0)} t que se justifican = 100 %)</p>
+      ${reparto100().tabla}
+      <p class="sub" style="margin:6px 0 0">Las causas que restaron suman más del 100 % y las que sumaron TCH (con % negativo) lo compensan; con lo «sin explicar», el total da exacto el 100 %.</p></section>
 
     <section><h3>Qué se midió en cada causa</h3>
       <p>Cada causa es un dato medido en campo, en estaciones o por satélite, y su peso sale de 7.433 cosechas de Riopaila de 2011 a 2026, comparando cada suerte
