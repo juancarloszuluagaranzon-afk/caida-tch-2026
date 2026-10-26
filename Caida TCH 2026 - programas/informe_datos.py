@@ -133,7 +133,7 @@ CAUSAS = [
      "mide": "Lluvia de los primeros 3 meses del ciclo (EMA), cuando rebrota la soca.",
      "efecto": f"Cada 100 mm de más en los meses 0-3: {tc(coef.loc['llu03_100', 'efecto %'])}."},
     {"id": "variedades", "nombre": "Variedades", "col": "Variedades", "grupo": "Agronómico y operativo",
-     "mide": "La variedad sembrada, frente a la mezcla de variedades de 2020-25.",
+     "mide": "La variedad sembrada, frente al abanico varietal de 2020-25.",
      "efecto": "Cada variedad tiene su propio efecto, medido en la misma suerte a lo largo de los años."},
     {"id": "edad", "nombre": "Edad de cosecha", "col": "Edad de cosecha", "grupo": "Agronómico y operativo",
      "mide": "Meses de edad al cortar, frente a la edad normal de 2020-25.",
@@ -408,11 +408,41 @@ sop["calor"]["ema"] = [[f.strftime("%Y-%m"), r1(CAL["La Paila"].get(f), 0), r1(N
                        for f in pd.date_range("2024-07-01", "2026-09-01", freq="MS")]
 s26 = q.groupby("var").Area.sum() / q.Area.sum()
 sR = ref.groupby("var").Area.sum() / ref.Area.sum()
-# área en ha: 2026 tal cual; «normal» = la mezcla de 2020-25 llevada al área cosechada en 2026 (mismo total, se compara la mezcla)
+# área en ha: 2026 tal cual; «normal» = el abanico varietal de 2020-25 llevado al área cosechada en 2026 (mismo total, se compara el abanico)
 HAQ = float(q.Area.sum())
 sop["variedades"] = {"v": [[v, r1(100 * s26.get(v, 0)), r1(100 * sR.get(v, 0)), r1(HAQ * s26.get(v, 0), 0), r1(HAQ * sR.get(v, 0), 0)]
                            for v in (s26 + sR).fillna(0).sort_values(ascending=False).index[:9]]}
-EDS = ["<9", "9-10", "10-11", "11-12", "12-13", "13-14", "14-15", ">15"]
+# por qué restaron: cada suerte frente a su propia variedad de 2020-25 (caida_integrada_rio.py, var_rel). Solo cuenta donde la
+# suerte cambió de variedad; se agrupa por el cambio (variedad de 2020-25 → variedad de 2026). Las filas suman la causa completa.
+XV = pd.read_pickle(PK / "caida_por_suerte.pkl")
+HAX = float(XV.Area.sum())
+VTOT = float((XV.Variedades * XV.Area).sum() / HAX * TN)
+h20 = ds[ds.anio.between(2020, 2025) & ds.ste.isin(XV.ste)].groupby("ste")["var"].agg(lambda s: s.mode().iloc[0])
+XV["antes"] = XV.ste.map(h20)
+XV["cambio"] = np.where(XV.antes.isna(), "sin historia", np.where(XV.antes == XV["var"], "misma", XV.antes.fillna("") + " → " + XV["var"]))
+G = XV.groupby("cambio").apply(lambda g: pd.Series({
+    "n": len(g), "ha": g.Area.sum(), "dif": np.average(np.expm1(g.Variedades), weights=g.Area) * TN,
+    "ap": (g.Variedades * g.Area).sum() / HAX * TN})).sort_values("ap")
+cam = G.drop(["misma", "sin historia"], errors="ignore")
+sale = cam.assign(de=[k.split(" → ")[0] for k in cam.index]).groupby("de").ap.sum().idxmin()   # la variedad cuya salida más restó
+vfil = [[k, int(r.n), r1(r.ha, 0), r1(r.dif, 1), r1(r.ap, 2)] for k, r in cam.iterrows() if k.startswith(sale + " → ")]
+otros = cam[[not k.startswith(sale + " → ") for k in cam.index]]
+grupos = [["Otros cambios de variedad", int(otros.n.sum()), r1(otros.ha.sum(), 0), None, r1(otros.ap.sum(), 2)]]
+for k, et in (("misma", "Mantuvieron su variedad"), ("sin historia", "Sin historia en 2020-25")):
+    if k in G.index:
+        grupos.append([et, int(G.loc[k, "n"]), r1(G.loc[k, "ha"], 0), None, r1(G.loc[k, "ap"], 2)])
+S0 = cam.loc[[r[0] for r in vfil]]
+sop["variedades"].update({"sale": sale, "cambios": vfil, "grupos": grupos, "total": r1(VTOT, 2),
+                          "sale_tot": [int(S0.n.sum()), r1(S0.ha.sum(), 0), r1(S0.ap.sum(), 2)],
+                          "cambiaron": [int(cam.n.sum()), r1(cam.ha.sum(), 0), int(XV.antes.notna().sum())]})
+_ha = f"{S0.ha.sum():,.0f}".replace(",", ".")
+next(k for k in CAUSAS if k["id"] == "variedades").update({
+    "mide": "Si la suerte cambió de variedad: la variedad cosechada en 2026 frente a la que tuvo la misma suerte en 2020-25. "
+            "Cuánto rinde cada variedad se mide en la misma suerte a lo largo de los años, descontando edad, corte, clima y tipo de cosecha. "
+            "Una suerte que mantuvo su variedad no suma ni resta por esta causa.",
+    "efecto": f"Restó porque {int(S0.n.sum())} cosechas ({_ha} ha) que en 2020-25 eran {sale} se cosecharon en 2026 "
+              f"con otras variedades que rinden menos en esas mismas suertes. Solo ese cambio explica {es(S0.ap.sum(), 2)} TCH."})
+EDS =["<9", "9-10", "10-11", "11-12", "12-13", "13-14", "14-15", ">15"]
 e26 = q.groupby("edad_b").Area.sum() / q.Area.sum()
 eR = ref.groupby("edad_b").Area.sum() / ref.Area.sum()
 sop["edad"] = {"e": [[k, r1(100 * e26.get(k, 0)), r1(100 * eR.get(k, 0)), r1(HAQ * e26.get(k, 0), 0), r1(HAQ * eR.get(k, 0), 0)] for k in EDS],

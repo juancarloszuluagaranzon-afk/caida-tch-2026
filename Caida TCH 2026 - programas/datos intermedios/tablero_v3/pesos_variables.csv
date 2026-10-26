@@ -3,8 +3,8 @@ Cosecha mecanizada,Agronómico y operativo,"−8,1 % mecanizada frente a manual 
 Días Tmax >32 °C,No controlable,"−0,2 % por día >32 °C en los 30 días antes de cosechar (p = 0,000)",modelo 2011-2026 (7.433 cosechas),1.974
 Balance hídrico: sequía al final,No controlable,"−0,9 % por 100 mm de déficit al final del ciclo (p = 0,000)",modelo 2011-2026 (7.433 cosechas),1.73
 Corte anterior en suelo húmedo,No controlable,"−4,3 % por cada 100 mm de lluvia en el mes del corte anterior (p = 0,000)",modelo 2011-2026 (7.433 cosechas),0.59
-Variedades,Agronómico y operativo,un efecto por variedad,modelo 2011-2026 (7.433 cosechas),0.516
 Corte anterior mecanizado,Agronómico y operativo,"−2,4 % corte anterior mecanizado después de manual (dos seguidos: −4,3 %) (p = 0,000)",modelo 2011-2026 (7.433 cosechas),0.491
+Variedades,Agronómico y operativo,un efecto por variedad,modelo 2011-2026 (7.433 cosechas),0.374
 Precipitación 0 a 3 meses,No controlable,"−0,8 % por 100 mm de lluvia en los meses 0-3 (p = 0,000)",modelo 2011-2026 (7.433 cosechas),0.231
 No renovación,Flujo de caja,"−2,3 % suerte no renovada (p = 0,630)",modelo 2011-2026 (7.433 cosechas),0.173
 Incendio,Agronómico y operativo,"−3,9 % cosecha por incendio (p = 0,004)",modelo 2011-2026 (7.433 cosechas),-0.043
@@ -12,7 +12,7 @@ Control de malezas,Flujo de caja,"−0,4 % por mes de atraso del herbicida despu
 Oportunidad roturación,Flujo de caja,"−1,8 % roturación tardía (p = 0,302)",modelo 2011-2026 (7.433 cosechas),-0.147
 Nivel freático,No controlable,"−8,0 % por metro de nivel promedio del ciclo por encima de 1,5 m (p = 0,000)",modelo 2011-2026 (7.433 cosechas),-0.213
 Oportunidad fertilización,Flujo de caja,"−0,8 % fertilización después de 120 días (p = 0,513)",modelo 2011-2026 (7.433 cosechas),-0.3
+Sin explicar,Sin explicar,lo que ninguna variable explica,,-0.469
 Balance hídrico: riego aplicado,Flujo de caja,"−0,9 % por 100 mm de déficit al final del ciclo (p = 0,000)",modelo 2011-2026 (7.433 cosechas),-0.472
 N° de corte,Agronómico y operativo,"cada corte quita productividad: −5,0 % en el 2º corte y −17,7 % en el 8º o más, frente a la plantilla (misma suerte); se compara con la historia de cada suerte",modelo 2011-2026 (7.433 cosechas),-0.603
-Sin explicar,Sin explicar,lo que ninguna variable explica,,-0.611
 Edad de cosecha,Agronómico y operativo,un efecto por rango de edad,modelo 2011-2026 (7.433 cosechas),-1.774

@@ -403,8 +403,8 @@ function soporte(id, el) {
     specs = [{ x: t.map(r => fecha(r[0]).split(' ').slice(1).join(' ')), series: [{ valores: t.map(r => r[3]), color: 'var(--quita)', d: 0 }], anchoBarra: 0.9, anchoEt: 64, yfmt: v => nf(v, 0) },
       { ...porMes('m', 2), yfmt: v => nf(v, 1) }];
   } else if (id === 'variedades') {
-    const leyHa = leyenda([['var(--quita)', '2026'], ['var(--hist)', 'Normal: mezcla de 2020-25 en la misma área de 2026']]);
-    html = caja('Área cosechada por variedad (ha)', 'Enero a septiembre de 2026 frente a la mezcla de 2020-25 llevada al área cosechada en 2026', leyHa);
+    const leyHa = leyenda([['var(--quita)', '2026'], ['var(--hist)', 'Normal: abanico varietal de 2020-25 en la misma área de 2026']]);
+    html = porQueVariedad(sp) + caja('Área cosechada por variedad (ha)', 'Enero a septiembre de 2026 frente al abanico varietal de 2020-25 llevado al área cosechada en 2026', leyHa);
     specs = [{ x: sp.v.map(r => r[0].replace('CC ', '')), series: [{ valores: sp.v.map(r => r[4]), color: 'var(--hist)', d: 0 }, { valores: sp.v.map(r => r[3]), color: 'var(--quita)', d: 0 }], anchoEt: 64, yfmt: v => nf(v, 0) }];
   } else if (id === 'corte-humedo') {
     html = caja('Área cuyo corte anterior se hizo con el suelo húmedo (ha)', `Mes del corte con 100 mm de lluvia o más · por año de cosecha (2026 = enero a septiembre). Lluvia promedio en el mes del corte anterior: 2026 ${nf(sp.mm[0], 0)} mm, normal ${nf(sp.mm[1], 0)} mm`);
@@ -486,6 +486,36 @@ function porQueCorte(sp, enDoc) {
     <p${enDoc ? '' : ' class="nota" style="margin:0"'}><b>Lo que hay que leer.</b> Este ${sg(tot / ha)} TCH no es una mejora de manejo: es el ciclo de renovación, que rejuveneció el cañaduzal
       y tapó parte de la caída. Las suertes renovadas van a envejecer año tras año: si no se sigue renovando al mismo ritmo, este factor dejará de sumar y empezará a restar.</p>`;
   return enDoc ? txt : `<div class="pila"><h3 style="margin:0">Por qué el número de corte sumó en 2026</h3>${txt}</div>`;
+}
+
+// por qué restaron las variedades: cada suerte frente a su propia variedad de 2020-25; solo cuentan las que cambiaron de variedad
+function porQueVariedad(sp, enDoc) {
+  if (!sp.cambios) return '';
+  const st = sp.sale_tot, cb = sp.cambiaron, misma = sp.grupos.find(g => g[0] === 'Mantuvieron su variedad');
+  const nomV = v => v === 'VARIAS' ? 'varias variedades en la suerte' : v === 'otra' ? 'otras variedades de poca área' : esc(v);
+  const fila = (et, n, ha, dif, ap) => `<tr><td>${et}</td><td class="n">${n}</td><td class="n">${nf(ha, 0)}</td>
+    <td class="n">${dif == null ? '' : `<span class="${clsImp(dif)}">${sg(dif)} TCH</span>`}</td>
+    <td class="n"><b class="${clsImp(ap)}">${sg(ap, 2)}</b></td><td class="n ${clsImp(ap)}">${sg(ap * R.ha, 0)}</td></tr>`;
+  const tabla = `<div class="tabla"><table><thead><tr><th>Variedad en 2020-25 → variedad en 2026</th><th class="n">Cosechas</th><th class="n">Área (ha)</th>
+    <th class="n">La nueva rinde frente a la anterior</th><th class="n">Le sumó o quitó (TCH)</th><th class="n">Toneladas</th></tr></thead><tbody>
+    ${sp.cambios.map(r => { const [a, b] = r[0].split(' → '); return fila(`${esc(a)} → ${nomV(b)}`, r[1], r[2], r[3], r[4]); }).join('')}
+    ${sp.grupos.map(g => fila(esc(g[0]), g[1], g[2], g[3], g[4])).join('')}
+    <tr><td><b>Total de la causa</b></td><td></td><td></td><td></td><td class="n"><b class="${clsImp(sp.total)}">${sg(sp.total, 2)}</b></td>
+      <td class="n"><b class="${clsImp(sp.total)}">${sg(sp.total * R.ha, 0)}</b></td></tr></tbody></table></div>`;
+  const peor = sp.cambios[0];
+  const txt = `<p><b>En una frase.</b> ${st[0]} cosechas (${nf(st[1], 0)} ha) que en 2020-25 eran ${esc(sp.sale)} se cosecharon en 2026 con otras variedades, y en esas mismas suertes
+      las variedades nuevas rinden menos. Eso explica ${sg(st[2], 2)} TCH del promedio de Riopaila (${sg(st[2] * R.ha, 0)} t).</p>
+    <p><b>Qué se compara.</b> Cada suerte contra sí misma: la variedad que se cosechó en 2026 frente a la que tuvo esa suerte en 2020-25. Cuánto rinde cada variedad
+      se mide en la misma suerte a lo largo de los años, descontando edad, número de corte, clima y tipo de cosecha. Una suerte que mantuvo su variedad no suma ni resta por esta causa,
+      aunque su variedad rinda menos que otras: eso ya está en su propia historia.</p>
+    <p><b>Qué pasó.</b> ${cb[0]} de las ${cb[2]} cosechas con historia (${nf(cb[1], 0)} ha) cambiaron de variedad. Lo que pesa es la salida de ${esc(sp.sale)}:
+      donde la reemplazaron ${nomV(peor[0].split(' → ')[1])}, la suerte rinde ${nf(Math.abs(peor[3]))} TCH menos que cuando era ${esc(sp.sale)}.
+      Donde la reemplazó la CC 05-430 la diferencia es pequeña. Los demás cambios (de variedades viejas a CC 05-430, CC 11-595 y otras) casi se compensan.</p>
+    ${tabla}
+    <p${enDoc ? '' : ' class="nota" style="margin:0"'}><b>Lo que no demuestra.</b> Es una causa pequeña (${sg(sp.total, 2)} TCH). La diferencia entre dos variedades en una misma suerte
+      tiene su margen de error, sobre todo en las de poca área. «Varias variedades» y «otras» son grupos, no una variedad. No dice que la CC 05-430 sea mala: donde reemplazó a la ${esc(sp.sale)}
+      rinde casi lo mismo.${misma ? ` Las ${misma[1]} cosechas que mantuvieron su variedad aportan ${sg(misma[4], 2)} TCH porque en 2020-25 algunas tuvieron más de una variedad.` : ''}</p>`;
+  return enDoc ? txt : `<div class="pila"><h3 style="margin:0">Por qué las variedades restaron en 2026</h3>${txt}</div>`;
 }
 
 // rebrote visto por el satélite: grupo frente a su control, a la misma edad de la soca
@@ -807,7 +837,7 @@ function vGerencia() {
       ${tb(['Corte', ...co.mezcla.map(r => r[0])], [['Área 2026 (ha)', ...co.mezcla.map(r => nf(r[3], 0))], ['Normal (ha)', ...co.mezcla.map(r => nf(r[4], 0))]], co.mezcla.map((_, i) => i + 1))}` : ''}
       ${ed ? `<p style="margin-top:10px"><b>Edad de cosecha (${ap('edad')} TCH).</b> En 2026 se cortó con ${nf(ed.prom[0])} meses en promedio, contra ${nf(ed.prom[1])} normal:
         ${nf((ed.e.find(r => r[0] === '12-13') || [])[3], 0)} ha se cortaron entre 12 y 13 meses (normal ${nf((ed.e.find(r => r[0] === '12-13') || [])[4], 0)} ha). Cortar con más edad da más toneladas.</p>` : ''}
-      ${va ? `<p style="margin-top:10px"><b>Variedades (${ap('variedades')} TCH).</b> Cambió la mezcla de variedades cosechadas: ${va.v.slice(0, 4).map(r => `${r[0]} ${nf(r[3], 0)} ha (normal ${nf(r[4], 0)} ha)`).join(', ')}.</p>` : ''}</section>
+      ${va ? `<p style="margin-top:10px"><b>Variedades (${ap('variedades')} TCH): suertes que dejaron la ${esc(va.sale || "")} rinden menos con su nueva variedad.</b></p>${porQueVariedad(va, true)}` : ''}</section>
 
     <section><h3>Qué tan seguro es</h3>
       <p>Ajustado solo con 2011-2025, sin ver 2026, el modelo predijo el <b>${nf(p.pct, 0)} %</b> de la caída, y año por año desde 2013 se movió con lo real

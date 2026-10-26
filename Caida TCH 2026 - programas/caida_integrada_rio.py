@@ -196,6 +196,11 @@ fcorte = P["Corte"] * c.Corte + c.soca_b.map(bandas).fillna(0.0)
 r20 = c.anio.between(2020, 2025)
 propio = (fcorte * c.Area)[r20].groupby(c.ste[r20]).sum() / c.Area[r20].groupby(c.ste[r20]).sum()
 q["corte_rel"] = (fcorte.loc[q.index] - q.ste.map(propio)).fillna(0.0)
+# variedades: la variedad de 2026 frente a la que tuvo la misma suerte en 2020-25 (26-oct; antes, frente al abanico varietal
+# de todo Riopaila, que le cargaba a una suerte el efecto de una variedad que ya tenía en su historia)
+fvar = c["var"].map(bv).fillna(0.0)
+propia_v = (fvar * c.Area)[r20].groupby(c.ste[r20]).sum() / c.Area[r20].groupby(c.ste[r20]).sum()
+q["var_rel"] = (fvar.loc[q.index] - q.ste.map(propia_v)).fillna(0.0)
 ETAPAS = [("2º", 2), ("3º", 3), ("4º", 4), ("5º", 5), ("6º-7º", 6.5), ("8º o más", float(c.Corte[c.Corte >= 8].median()))]
 efecto_corte = pd.DataFrame([{"corte": e, "efecto_pct": 100 * np.expm1(P["Corte"] * (n - 1) + bandas.get(
     next(k for k in bandas if float(k.strip("(]").split(",")[0]) < n <= float(k.strip("(]").split(",")[1])), 0.0))}
@@ -229,7 +234,7 @@ A = {
     "Corte anterior en suelo húmedo": humedo("ca_mm100", ok_ca, ref),
     "Nivel freático": P["nf_exc15"] * (wm(nf26, "nf_exc15") - wm(ref_nf, "nf_exc15")) * nf26.Area.sum() / q.Area.sum(),
 
-    "Variedades": sum((s26.get(v, 0) - sR.get(v, 0)) * bv.get(v, 0.0) for v in set(s26.index) | set(sR.index)),
+    "Variedades": wm(q, "var_rel"),
     "Edad de cosecha": sum(ed[k] * (wm(q, "e_" + k) - wm(ref, "e_" + k)) for k in EDADES),
     "Número de corte": wm(q, "corte_rel"),
     "Incendio": P["inc"] * (wm(q, "inc") - wm(ref, "inc")),
@@ -253,7 +258,7 @@ POR = pd.DataFrame({
     "Corte anterior en suelo húmedo": P["ca_mm100"] * (q.ca_mm100 - NIVEL["ca_mm100"][1]) * ok_ca(q),
     "Nivel freático": P["nf_exc15"] * (q.nf_exc15 - wm(ref_nf, "nf_exc15")) * (1 - q.nf_na),
 
-    "Variedades": q["var"].map(bv).fillna(0.0) - sum(sR.get(v, 0) * bv.get(v, 0.0) for v in sR.index),
+    "Variedades": q.var_rel,
     "Edad de cosecha": sum(ed[k] * (q["e_" + k] - wm(ref, "e_" + k)) for k in EDADES),
     "Número de corte": q.corte_rel,
     "Incendio": P["inc"] * (q.inc - wm(ref, "inc")),
