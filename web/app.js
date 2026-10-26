@@ -5,6 +5,7 @@
 const $app = document.getElementById('app');
 let R, C, S, F, V, E, CAUSA, SUERTE;
 let DV = null, AFO = {};   // aforo frente al óptimo de la variedad (desarrollo.json, desarrollo_optimo.py); opcional
+let BL = null;             // balance hídrico de Cenicaña y riego aplicado en mm (balance.json, balance_riego.py); opcional
 let vistaActual = '';
 
 // ---------------------------------------------------------------- formatos
@@ -437,6 +438,30 @@ function soporte(id, el) {
   }
 }
 
+// la sequía y el riego vistos con otra fuente: balance de Cenicaña desde 1993 y riegos en mm desde 2021 (pestaña de gerencia)
+function balanceDoc() {
+  if (!BL) return '';
+  const pr = BL.pruebas, an = BL.anios.filter(r => r[0] >= 2015);
+  const conf = x => x.p < 0.05 ? `sí (${x.p < 0.001 ? 'p < 0,001' : 'p = ' + nf(x.p, 3)})` : `no (p = ${nf(x.p, 2)})`;
+  const tbl = (cab, filas, num) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
+    <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  return `<p style="margin-top:10px"><b>Otra fuente lo confirma: el balance hídrico y el riego en milímetros.</b> Con el clima mensual de Cenicaña desde 1993
+      (La Paila y Bugalagrande) se calculó, para ${nf(BL.cosechas, 0)} cosechas de 2011 a 2026, el agua que faltó del mes 8 del ciclo a la cosecha
+      (lo que consume la caña, 0,8 × evaporación, menos la lluvia). Para ${nf(BL.cosechas_riego, 0)} cosechas se sumaron los mm de riego aplicados según el
+      consolidado de riegos (${nf(BL.riegos, 0)} riegos de ${BL.riego_desde} a ${fecha(BL.riego_hasta)}). Cada suerte frente a sí misma, con los mismos controles del modelo:</p>
+    ${tbl(['Prueba', 'Cosechas', 'Por cada 100 mm', '¿Confiable?'], pr.map(x => [esc(x.prueba), nf(x.n, 0),
+      `<b class="${clsImp(x.tch)}">${sg(x.tch)} TCH</b> (${sg(x.pct)} %)`, conf(x)]), [1, 2])}
+    ${tbl(['Año de cosecha', ...an.map(r => r[0])], [['Falta de agua al final del ciclo (mm)', ...an.map(r => nf(r[1], 0))],
+      ['Riego aplicado al final del ciclo (mm)', ...an.map(r => r[2] == null ? '—' : nf(r[2], 0))]], an.map((_, i) => i + 1))}
+    <p style="margin-top:8px">La falta de agua resta en todos los años desde 2011, regar recupera una parte pequeña por milímetro y lo que el riego no cubre es lo que más cuesta.
+      Por eso el riego teórico tiene sentido, pero se debe medir en mm aplicados frente a la falta del balance: contando riegos (la hoja de riegos teóricos 2026)
+      no aparece ningún efecto, porque un riego no es una cantidad fija de agua (de unos 25 a 60 mm según el año en este registro).
+      Este balance es respaldo de la sequía y el riego, no una causa más: entrarlo al modelo contaría el agua dos veces.</p>
+    <p class="sub" style="margin:4px 0 0">Lo que no demuestra: el balance es por estación y por mes (no por suerte), el consumo de la caña es un supuesto simple, el riego de 2026 llega
+      hasta ${fecha(BL.riego_hasta)}, desde 2024 cada riego aparece con menos mm (posible cambio de registro, por confirmar con Recursos Hídricos) y se riega
+      primero donde más falta hace, lo que puede hacer ver menor el efecto del riego. Efectos en TCH sobre el TCH normal 2020-25 (${nf(BL.tch_base)}).</p>`;
+}
+
 // por qué el número de corte sumó en 2026: cada suerte frente al corte promedio de su propia historia (lo usan la causa y la gerencia)
 function porQueCorte(sp, enDoc) {
   if (!sp.grupos) return '';
@@ -829,7 +854,8 @@ function vGerencia() {
         a lo normal, pero ${nf(haArea(s => s.nf != null && s.nf < 1), 0)} ha cosechadas tuvieron el agua a menos de 1 m y ahí sí resta.</p>
       <p><b>Cosecha con suelo húmedo.</b> ${nf(chA && chA.ha ? (chA.ha.find(r => r[0] === 2026) || [])[1] : haArea(s => s.mmca != null && s.mmca >= 100), 0)} ha cosechadas en 2026 venían de un corte hecho en un mes con 100 mm de lluvia
         o más${humHa2425 != null ? `, contra ${nf(humHa2425, 0)} ha por año en 2024-25 (años completos)` : ''}. ${esc(causa('corte-humedo').efecto)}
-        Roturar o fertilizar con el suelo húmedo (lluvia en los 5 días antes) se probó y no mostró un efecto confiable.</p></section>
+        Roturar o fertilizar con el suelo húmedo (lluvia en los 5 días antes) se probó y no mostró un efecto confiable.</p>
+      ${balanceDoc()}</section>
 
     <section><h3>Número de corte, edad de cosecha y variedades</h3>
       ${co ? `<p><b>Número de corte (${ap('corte')} TCH): cada corte resta, pero en 2026 se cosecharon socas más jóvenes.</b> Frente a la plantilla, en la misma suerte: ${co.efecto.map(r => `${r[0]} ${sg(r[2])} TCH`).join(', ')} (sobre el TCH de las plantillas 2020-25, ${nf(co.plantilla_tch)}).
@@ -864,7 +890,8 @@ function vGerencia() {
         antes de la cosecha 2027, las suertes de la alerta que rebrotaron peor.</li>
       <li><b>Armar el presupuesto 2027 desde el histórico de cada suerte</b>, ajustado por tipo de cosecha y edad.</li>
       <li><b>Seguir la caída mes a mes</b> con el mismo modelo y la misma prueba; medir el madurante y el desarrollo de la caña con el aforo de cada mes.</li>
-      <li><b>Conectar el Registro de NF</b> como fuente fija para el nivel freático.</li></ol></section>
+      <li><b>Conectar el Registro de NF</b> como fuente fija para el nivel freático.</li>
+      ${BL ? '<li><b>Evaluar el riego en milímetros</b> frente a la falta de agua del balance hídrico (no en número de riegos) y confirmar con Recursos Hídricos el registro de los riegos desde 2024.</li>' : ''}</ol></section>
 
     <section><h3>Cómo recorrer el informe en línea</h3><ol style="margin:0;padding-left:20px">
       <li><b>Resumen.</b> Histórico, presupuesto y real; las causas y el puente al presupuesto, con filtros por hacienda, zona, zona agroecológica, variedad, tipo de cosecha y mes.</li>
@@ -882,6 +909,8 @@ function vGerencia() {
         ['Nivel freático', 'Registro de NF de Ingeniería Agrícola, 202 pozos', 'oct-2020'],
         ['Roturación, herbicida, fertilización', 'Control de roturación, bases de aplicaciones y SimpleAgri', '2024'],
         ['NDVI y NDMI', 'Sentinel-2 por Earth Engine, promedio mensual por suerte', '2019'],
+        ['Balance hídrico (soporte)', 'Clima mensual de Cenicaña por estación: lluvia y evaporación', '1993'],
+        ['Riego aplicado en mm (soporte)', 'Consolidado de riegos del balance hídrico', '2021'],
         ['Aforo (población, altura, diámetro)', 'Aforo suerte a suerte y tabla de óptimos por variedad', '2026'],
         ['PPTO, zona, hacienda y fecha de corte', 'Maestro de Suertes 2026 (TCH PPTO, columna AG)', '2026']], [2])}
       <p style="margin-top:8px">El modelo es una regresión del TCH (en logaritmo) sobre 7.433 cosechas de Riopaila de 2011 a 2026, ponderada por área, con un nivel propio para
@@ -1099,9 +1128,9 @@ window.addEventListener('hashchange', () => ruta());
 
 Promise.all(['resumen', 'causas', 'suertes', 'fichas', 'validacion', 'escenas_bloque3501'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => {
   if (!r.ok) throw new Error(`${n}.json: ${r.status}`); return r.json();
-})).concat(fetch('data/desarrollo.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null)))
-  .then(([r, c, s, f, v, e, d]) => {
-    R = r; C = c; S = s; F = f; V = v; E = e; DV = d;
+})).concat(['desarrollo', 'balance'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null))))
+  .then(([r, c, s, f, v, e, d, b]) => {
+    R = r; C = c; S = s; F = f; V = v; E = e; DV = d; BL = b;
     if (DV) DV.filas.forEach(x => AFO[x.s + '|' + x.m] = x);
     ruta();
   })
