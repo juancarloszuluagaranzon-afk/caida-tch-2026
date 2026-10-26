@@ -553,11 +553,26 @@ function vCausa(id) {
   const conH = S.filter(s => s.hist != null);
   const mx = Math.max(0.5, ...conH.map(s => Math.abs(s.ap[c.id] || 0)));
   const nAf = conH.filter(s => (s.ap[c.id] || 0) > 0.5).length, nFa = conH.filter(s => (s.ap[c.id] || 0) < -0.5).length;
+  // el 100 % es la caída que se justifica (toneladas); las causas que sumaron TCH entran con % negativo
+  const tq = x => x.t_ha * R.ha, tSE = R.sin_explicar * R.ha;
+  const base = C.causas.reduce((a, x) => a + tq(x), 0) + tSE, pc = t => 100 * t / base;
+  const pcT = v => (v < -0.04 ? '−' : '') + nf(Math.abs(v), 1);
+  const pcC = pc(tq(c));
+  const reparto = [...C.causas].sort((a, b) => tq(b) - tq(a)).map(x => `<tr${x.id === c.id ? ' class="actual"' : ''}><td><a href="#causa/${x.id}">${esc(x.nombre)}</a></td>
+      <td class="n ${clsImp(-x.t_ha)}">${sg(-x.t_ha)}</td><td class="n">${sg(-tq(x), 0)}</td><td class="n"><b>${pcT(pc(tq(x)))} %</b></td></tr>`).join('') +
+    `<tr><td>Sin explicar</td><td class="n">${sg(-R.sin_explicar)}</td><td class="n">${sg(-tSE, 0)}</td><td class="n"><b>${pcT(pc(tSE))} %</b></td></tr>
+     <tr class="total"><td><b>Caída que se justifica</b></td><td class="n"><b>${sg(-R.caida)}</b></td><td class="n"><b>${sg(-R.t_caida, 0)}</b></td><td class="n"><b>100 %</b></td></tr>`;
   $app.innerHTML = `<div class="causas"><nav class="lista-causas" aria-label="Causas">${lista}</nav>
     <section class="pila">
       <div class="caja"><span class="chip">${esc(c.grupo)}</span>
         <h2 style="margin-top:8px">${esc(c.nombre)}</h2>
         <div class="cifra num ${clsImp(-c.t_ha)}">${sg(-c.t_ha, 2)} TCH <span style="font-size:15px;font-weight:400;color:var(--muted)">en promedio · ${sg(-c.t_ha * R.ha, 0)} t en ${nf(R.ha, 0)} ha</span></div>
+        <div class="peso100">${pcC >= 0 ? `Es el <b class="t-q">${nf(pcC, 1)} %</b> de la caída que se justifica`
+          : `Compensó el <b class="t-s">${nf(-pcC, 1)} %</b> de la caída que se justifica`} (${nf(R.t_caida, 0)} t = 100 %)
+          <div class="barra100" aria-hidden="true"><div style="width:${Math.min(100, Math.abs(pcC))}%;background:${pcC >= 0 ? 'var(--quita)' : 'var(--suma)'}"></div></div></div>
+        <details class="reparto"><summary>Ver cómo se reparte el 100 % entre todas las causas</summary>
+          <div class="tabla"><table><thead><tr><th>Causa</th><th class="n">TCH</th><th class="n">Toneladas</th><th class="n">% de la caída</th></tr></thead><tbody>${reparto}</tbody></table></div>
+          <p class="sub" style="margin:6px 0 0">Las causas que restaron suman más del 100 % y las que sumaron TCH (en verde, con % negativo) lo compensan; con lo «sin explicar», el total da exacto el 100 %.</p></details>
         <p style="margin:10px 0 4px"><b>Qué mide.</b> ${esc(c.mide)}</p>
         <p style="margin:0"><b>Cuánto pesa.</b> ${esc(c.efecto)} Medido en 7.433 cosechas de 2011 a 2026, cada suerte frente a sí misma.</p>
         ${C.tch_base ? `<p class="sub" style="margin:4px 0 0">El efecto del modelo es un %; en TCH se calcula sobre el TCH normal 2020-25 de Riopaila (${nf(C.tch_base)} TCH), salvo que el texto diga otra base.</p>` : ''}
