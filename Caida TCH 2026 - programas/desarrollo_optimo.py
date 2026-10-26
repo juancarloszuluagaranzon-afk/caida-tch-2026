@@ -42,17 +42,18 @@ def leer(hoja, cab, off):
     """Columnas de la base de aforos (las hojas difieren en una columna inicial)."""
     d = pd.read_excel(AFO, sheet_name=hoja, header=None, skiprows=cab)
     c = lambda i: d.iloc[:, i + off]  # noqa: E731
-    x = pd.DataFrame({"fecha": c(2), "ste": c(5), "var": c(6), "edad": c(7), "alt": c(15), "dia": c(21), "pob": c(24)})
-    for k in ["edad", "alt", "dia", "pob"]:
+    x = pd.DataFrame({"fecha": c(2), "ste": c(5), "var": c(6), "edad": c(7), "alt": c(15), "dia": c(21), "pob": c(24), "kg": c(18)})
+    for k in ["edad", "alt", "dia", "pob", "kg"]:
         x[k] = pd.to_numeric(x[k], errors="coerce")
     x["fecha"] = pd.to_datetime(x.fecha, errors="coerce")
     x["ste"], x["var"] = x.ste.astype(str).str.strip(), x["var"].map(nv)
+    x["kg"] = (x.kg / 10).where(lambda v: v.between(0.3, 4))   # «Total Peso» = 10 tallos (TCH calculado ≈ 0,67 × tallos/m × Total Peso)
     return x[x.pob.between(4, 25) & x.alt.between(80, 450) & x.dia.between(1.5, 4.5) & x.fecha.notna()]
 
 
 af = pd.concat([leer("AFOROS 2022-2023", 4, 0), leer("BASE 2022-2023", 4, 1), leer("Aforos 2024-2026", 2, 0)]).drop_duplicates()
 af = af[af.edad.fillna(12) >= 9]          # aforo de caña para cosechar, no de seguimiento de caña joven
-g = af.groupby(["ste", "fecha"]).agg(alt=("alt", "mean"), dia=("dia", "mean"), pob=("pob", "mean"), var=("var", "first")).reset_index()
+g = af.groupby(["ste", "fecha"]).agg(alt=("alt", "mean"), dia=("dia", "mean"), pob=("pob", "mean"), kg=("kg", "mean"), var=("var", "first")).reset_index()
 G = {k: v.sort_values("fecha") for k, v in g.groupby("ste")}
 print(f"aforos: {len(af)} tablones, {len(g)} aforos de suerte")
 
@@ -70,7 +71,7 @@ def aforo(r):
 
 
 m = [aforo(r) for r in h.itertuples()]
-for k in ["fecha", "alt", "dia", "pob", "var"]:
+for k in ["fecha", "alt", "dia", "pob", "kg", "var"]:
     h["af_" + k] = [x[k] if x is not None else None for x in m]
 x = h[h.af_pob.notna()].merge(o, left_on="af_var", right_on="var", how="inner")
 for k in ["pob", "alt", "dia"]:
@@ -82,7 +83,10 @@ print("cosechas con aforo y óptimo por año:", x.groupby("anio").size().to_dict
 
 K = ["pob", "alt", "dia", "peso"]
 w = lambda L, k: float(np.average(L[k], weights=L.Area)) if len(L) else None  # noqa: E731
-res = lambda L: {"cosechas": int(len(L)), "ha": r1(L.Area.sum(), 0), **{k: r1(w(L, "p_" + k)) for k in K}, "tch": r1(w(L, "tch_calc"))}  # noqa: E731
+wv = lambda L, k: float(np.average(L[k].dropna().astype(float), weights=L.Area[L[k].notna()])) if L[k].notna().any() else None  # noqa: E731
+# % del óptimo y, aparte, los valores medidos ponderados por área: longitud (cm), diámetro (cm), tallos/m y peso por tallo (kg)
+res = lambda L: {"cosechas": int(len(L)), "ha": r1(L.Area.sum(), 0), **{k: r1(w(L, "p_" + k)) for k in K}, "tch": r1(w(L, "tch_calc")),  # noqa: E731
+                 "v_alt": r1(wv(L, "af_alt"), 0), "v_dia": r1(wv(L, "af_dia"), 2), "v_pob": r1(wv(L, "af_pob"), 1), "v_kg": r1(wv(L, "af_kg"), 2)}
 both = sorted(set(x[x.per == "2026"].ste) & set(x[x.per == "hist"].ste))
 y = x[x.ste.isin(both)]
 top = x[x.per == "2026"].groupby("af_var").Area.sum().sort_values(ascending=False).index[:8]
@@ -94,24 +98,25 @@ out = {"todas": {p: res(x[x.per == p]) for p in ("hist", "2026")},
        "optimo": [[r.var, r1(r.oalt), r1(r.odia, 2), r1(r.opob, 2)] for r in o.itertuples()],
        # 2026 por cosecha, para la ficha de cada suerte
        "filas": [{"s": r.ste, "m": int(r.Mes), "v": r.af_var, "alt": r1(r.af_alt), "oalt": r1(r.oalt), "pob": r1(r.af_pob, 2),
-                  "opob": r1(r.opob, 2), "dia": r1(r.af_dia, 2), "odia": r1(r.odia, 2)} for r in x[x.per == "2026"].itertuples()]}
+                  "opob": r1(r.opob, 2), "dia": r1(r.af_dia, 2), "odia": r1(r.odia, 2), "kg": r1(r.af_kg, 2)} for r in x[x.per == "2026"].itertuples()]}
 for p, et in (("hist", "Histórico 2023-25"), ("2026", "2026")):
     print(f"{et}: todas {out['todas'][p]} | mismas {out['mismas'][p]}")
 
 # ---------------------------------------------------------------- salida
 NOM = {"cosechas": "Cosechas", "ha": "Área (ha)", "pob": "Población % del óptimo", "alt": "Altura % del óptimo",
-       "dia": "Diámetro % del óptimo", "peso": "Peso de caña % del óptimo", "tch": "TCH"}
+       "dia": "Diámetro % del óptimo", "peso": "Peso de caña % del óptimo", "tch": "TCH",
+       "v_alt": "Longitud (cm)", "v_dia": "Diámetro (cm)", "v_pob": "Tallos/m", "v_kg": "Peso por tallo (kg)"}
 tab = lambda d: pd.DataFrame(d).T.rename(columns=NOM).rename(index={"hist": "Histórico 2023-25"})  # noqa: E731
 col = x[["ste", "anio", "Mes", "Area", "tch_calc", "af_fecha", "af_var", "af_pob", "opob", "p_pob", "af_alt", "oalt", "p_alt",
-         "af_dia", "odia", "p_dia", "p_peso"]].rename(columns={"ste": "Suerte", "anio": "Año", "Mes": "Mes", "Area": "Área (ha)",
+         "af_dia", "odia", "p_dia", "af_kg", "p_peso"]].rename(columns={"ste": "Suerte", "anio": "Año", "Mes": "Mes", "Area": "Área (ha)",
          "tch_calc": "TCH", "af_fecha": "Fecha aforo", "af_var": "Variedad aforo", "af_pob": "Tallos/m", "opob": "Tallos/m óptimo",
          "p_pob": "Población %", "af_alt": "Altura (cm)", "oalt": "Altura óptima", "p_alt": "Altura %", "af_dia": "Diámetro (cm)",
-         "odia": "Diámetro óptimo", "p_dia": "Diámetro %", "p_peso": "Peso de caña %"})
+         "odia": "Diámetro óptimo", "p_dia": "Diámetro %", "af_kg": "Peso por tallo (kg)", "p_peso": "Peso de caña %"})
 with pd.ExcelWriter(OUT) as wr:
     tab(out["todas"]).to_excel(wr, sheet_name="Todas las cosechas")
     tab({k: v for k, v in out["mismas"].items() if k != "suertes"}).to_excel(wr, sheet_name="Mismas suertes")
     pd.DataFrame({a: v for a, v in out["anios"]}).T.rename(columns=NOM).to_excel(wr, sheet_name="Por año")
-    pd.DataFrame([{"Variedad": v, **{f"{NOM[k]} {p}": d[k] for p, d in (("histórico", hh), ("2026", nn)) for k in ["cosechas", "pob", "alt", "dia", "peso"]}}
+    pd.DataFrame([{"Variedad": v, **{f"{NOM[k]} {p}": d[k] for p, d in (("histórico", hh), ("2026", nn)) for k in ["cosechas", "v_alt", "v_dia", "v_pob", "v_kg", "pob", "alt", "dia", "peso"]}}
                   for v, hh, nn in out["variedades"]]).to_excel(wr, sheet_name="Por variedad", index=False)
     col.round(2).to_excel(wr, sheet_name="Cosechas con aforo", index=False)
     o.rename(columns={"var": "Variedad", "oalt": "Altura (cm)", "odia": "Diámetro (cm)", "opob": "Tallos/m"}).to_excel(wr, sheet_name="Óptimo por variedad", index=False)

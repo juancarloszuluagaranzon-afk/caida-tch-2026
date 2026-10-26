@@ -651,7 +651,7 @@ const pctO = (r, k) => 100 * r[k] / r['o' + k];
 // peso de caña ∝ tallos × altura × diámetro² (volumen del tallo), frente al mismo producto del óptimo
 const pesoO = r => 100 * (r.pob * r.alt * r.dia ** 2) / (r.opob * r.oalt * r.odia ** 2);
 const clsO = v => Math.round(v) < 95 ? 't-q' : Math.round(v) > 105 ? 't-s' : '';   // con el valor redondeado que se muestra
-const MEDO = { pob: 'Población', alt: 'Altura', dia: 'Diámetro', peso: 'Peso de caña' };
+const MEDO = { pob: 'Población', alt: 'Longitud', dia: 'Diámetro', peso: 'Peso de caña' };
 const UNI = { pob: 'tallos/m', alt: 'cm', dia: 'cm' };
 
 // histórico 2023-25 contra 2026, ponderado por área: lo usan la pestaña y la explicación para la gerencia
@@ -664,21 +664,28 @@ function desarrolloHtml(enDoc) {
     <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   const h = M.hist, n = M['2026'];
   const lead = `<p>En las mismas ${M.suertes} suertes, la caña de 2026 llegó a la cosecha con <b>${nf(h.peso - n.peso, 0)} puntos menos de peso de caña</b> frente al óptimo
-      de su variedad que en su historia 2023-25 (${nf(n.peso, 0)} % contra ${nf(h.peso, 0)} %), sobre todo porque llegó <b>más baja</b> (altura ${nf(n.alt, 0)} % contra ${nf(h.alt, 0)} %).
+      de su variedad que en su historia 2023-25 (${nf(n.peso, 0)} % contra ${nf(h.peso, 0)} %), sobre todo porque llegó <b>más corta</b> (longitud ${nf(n.alt, 0)} % contra ${nf(h.alt, 0)} %${h.v_alt != null ? `: ${nf(n.v_alt, 0)} cm contra ${nf(h.v_alt, 0)} cm` : ''}).
       La población bajó poco (${nf(n.pob, 0)} % contra ${nf(h.pob, 0)} %) y el diámetro quedó igual. En esas suertes el TCH pasó de ${nf(h.tch)} a ${nf(n.tch)}.</p>`;
-  const resumen = tbl(['', 'Cosechas', 'Área (ha)', 'Población', 'Altura', 'Diámetro', 'Peso de caña', 'TCH'], [
+  const resumen = tbl(['', 'Cosechas', 'Área (ha)', 'Población', 'Longitud', 'Diámetro', 'Peso de caña', 'TCH'], [
     fila(`<b>Mismas suertes</b> · histórico 2023-25`, h), fila('Mismas suertes · 2026', n),
     ['Diferencia', '', '', ...K.map(k => dp(h[k], n[k]) + ' pts'), dp(h.tch, n.tch, 1)],
     fila('Todas las cosechas · histórico 2023-25', T.hist), fila('Todas las cosechas · 2026', T['2026'])], [1, 2, 3, 4, 5, 6, 7]);
-  const vari = tbl(['Variedad', 'Cosechas hist. · 2026', 'Población hist. → 2026', 'Altura hist. → 2026', 'Peso de caña hist. → 2026'],
-    DV.variedades.map(([v, a, b]) => [esc(v), `${a.cosechas} · ${b.cosechas}`, `${pc(a.pob)} → ${pc(b.pob)}`, `${pc(a.alt)} → ${pc(b.alt)}`, `${pc(a.peso)} → <b>${pc(b.peso)}</b>`]), [1, 2, 3, 4]);
-  const nota = `<p class="sub" style="margin:6px 0 0">% del óptimo de cada variedad (tabla de óptimos por variedad), ponderado por el área de cada cosecha; peso de caña = tallos × altura × diámetro².
+  // valores medidos ponderados por área (longitud = altura del tallo); el color dice si quedó a más de 5 % del óptimo
+  const vm = (x, k, d, pk) => x[k] == null ? '—' : `<span class="${pk ? clsO(x[pk]) : ''}">${nf(x[k], d)}</span>`;
+  const par = (a, b, k, d, pk) => `${vm(a, k, d, pk)} → <b>${vm(b, k, d, pk)}</b>`;
+  const vari = tbl(['Variedad', 'Cosechas hist. · 2026', 'Longitud (cm)', 'Diámetro (cm)', 'Peso por tallo (kg)', 'Tallos por metro', 'Peso de caña frente al óptimo'],
+    DV.variedades.map(([v, a, b]) => [esc(v), `${a.cosechas} · ${b.cosechas}`, par(a, b, 'v_alt', 0, 'alt'), par(a, b, 'v_dia', 2, 'dia'), par(a, b, 'v_kg', 2),
+      par(a, b, 'v_pob', 1, 'pob'), `${pc(a.peso)} → <b>${pc(b.peso)}</b>`]), [1, 2, 3, 4, 5, 6]);
+  const medido = h.v_alt == null ? '' : tbl(['Mismas suertes, valores medidos', 'Longitud (cm)', 'Diámetro (cm)', 'Peso por tallo (kg)', 'Tallos por metro'], [
+    ['Histórico 2023-25', nf(h.v_alt, 0), nf(h.v_dia, 2), nf(h.v_kg, 2), nf(h.v_pob, 1)], ['2026', nf(n.v_alt, 0), nf(n.v_dia, 2), nf(n.v_kg, 2), nf(n.v_pob, 1)],
+    ['Diferencia', dp(h.v_alt, n.v_alt), dp(h.v_dia, n.v_dia, 2), dp(h.v_kg, n.v_kg, 2), dp(h.v_pob, n.v_pob, 1)]], [1, 2, 3, 4]);
+  const nota = `<p class="sub" style="margin:6px 0 0">% del óptimo de cada variedad (tabla de óptimos por variedad), ponderado por el área de cada cosecha; peso de caña = tallos × longitud × diámetro².
       A cada cosecha de enero a septiembre le toca el aforo de su suerte más cercano antes del corte (unos ${DV.dias_aforo} días antes). El histórico es 2023-25: antes casi no hay
       aforos cerca del corte, y en 2023 se aforó solo una parte. No es una causa más: es el camino por el que actúan el calor, la sequía o la cosecha mecanizada,
       por eso no se suma en las causas. Con esta base, la diferencia de aforo entre corte anterior mecanizado y manual no resultó confiable.</p>`;
-  return enDoc ? `${lead}${resumen}<p style="margin-top:8px"><b>Por variedad</b> (las de más área en 2026)</p>${vari}${nota}`
-    : `${lead}<div class="caja"><h3>Histórico 2023-25 contra 2026</h3>${resumen}</div><div class="caja"><h3>Por variedad</h3>
-       <p class="sub" style="margin-bottom:8px">Las de más área en 2026. Rojo: más de 5 % por debajo del óptimo.</p>${vari}</div><div class="nota">${nota.replace('class="sub" ', '')}</div>`;
+  return enDoc ? `${lead}${resumen}${medido ? `<p style="margin-top:8px"><b>Valores medidos</b> (ponderados por área)</p>${medido}` : ''}<p style="margin-top:8px"><b>Por variedad</b> (las de más área en 2026; valores medidos ponderados por área, histórico → 2026)</p>${vari}${nota}`
+    : `${lead}<div class="caja"><h3>Histórico 2023-25 contra 2026</h3>${resumen}${medido ? `<p class="sub" style="margin:12px 0 6px">Lo mismo en valores medidos, ponderados por el área de cada cosecha:</p>${medido}` : ''}</div><div class="caja"><h3>Por variedad</h3>
+       <p class="sub" style="margin-bottom:8px">Las de más área en 2026. Valores medidos en el aforo, ponderados por el área de cada cosecha: histórico 2023-25 → 2026. Longitud = altura del tallo; peso por tallo = peso de los 10 tallos del aforo ÷ 10. Rojo: más de 5 % por debajo del óptimo de la variedad.</p>${vari}</div><div class="nota">${nota.replace('class="sub" ', '')}</div>`;
 }
 
 function vDesarrollo() {
@@ -703,7 +710,8 @@ function afoFicha(s) {
     <p class="sub" style="margin-bottom:8px">Aforo de la caña en pie antes de la cosecha. Rojo: más de 5 % por debajo del óptimo.</p>
     <div class="tabla"><table><thead><tr><th>Medida</th><th class="n">Aforo</th><th class="n">Óptimo</th><th class="n">% del óptimo</th></tr></thead><tbody>
       ${fila('pob')}${fila('alt')}${fila('dia')}
-      <tr><td><b>Peso de caña</b> (tallos × altura × diámetro²)</td><td></td><td></td><td class="n"><b class="${clsO(pesoO(r))}">${nf(pesoO(r), 0)} %</b></td></tr>
+      ${r.kg != null ? `<tr><td>Peso por tallo (kg)</td><td class="n">${nf(r.kg, 2)}</td><td class="n">—</td><td></td></tr>` : ''}
+      <tr><td><b>Peso de caña</b> (tallos × longitud × diámetro²)</td><td></td><td></td><td class="n"><b class="${clsO(pesoO(r))}">${nf(pesoO(r), 0)} %</b></td></tr>
     </tbody></table></div><p class="sub" style="margin:6px 0 0"><a href="#desarrollo">Ver el histórico contra 2026 por variedad</a></p></div>`;
 }
 
@@ -917,7 +925,7 @@ function vGerencia() {
         está en el informe en línea, en la causa «Cosecha mecanizada».</p>` : ''}</section>
 
     ${DV && DV.mismas ? `<section><h3>Desarrollo de la caña: histórico contra 2026, frente al óptimo de cada variedad</h3>
-      <p>El aforo mide la caña en pie antes de la cosecha: tallos por metro (población), altura y diámetro. Comparado con el óptimo de su variedad, muestra cuánta caña había para cosechar.</p>
+      <p>El aforo mide la caña en pie antes de la cosecha: tallos por metro (población), longitud, diámetro y peso por tallo. Comparado con el óptimo de su variedad, muestra cuánta caña había para cosechar.</p>
       ${desarrolloHtml(true)}</section>` : ''}
     ${SU && SU.grupos ? `<section><h3>Suelos: grupo de humedad de lo cosechado en 2026</h3>
       ${suelosHtml(true)}</section>` : ''}
