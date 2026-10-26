@@ -4,6 +4,8 @@
 
 const $app = document.getElementById('app');
 let R, C, S, F, V, E, CAUSA, SUERTE;
+let HU = null;   // cómo se comportó cada suerte frente a su grupo de humedad (humedad.json, humedad_comportamiento.py); opcional
+let SU = null;   // grupo de humedad del suelo de lo cosechado en 2026 (suelos.json, suelos_humedad.py); opcional
 let DV = null, AFO = {};   // aforo frente al óptimo de la variedad (desarrollo.json, desarrollo_optimo.py); opcional
 let BL = null;             // balance hídrico de Cenicaña y riego aplicado en mm (balance.json, balance_riego.py); opcional
 let RF = null;             // R² del PPTO y del aforo para comparar con el del modelo (referencias.json, referencias_r2.py); opcional
@@ -705,6 +707,109 @@ function afoFicha(s) {
     </tbody></table></div><p class="sub" style="margin:6px 0 0"><a href="#desarrollo">Ver el histórico contra 2026 por variedad</a></p></div>`;
 }
 
+// ---------------------------------------------------------------- suelos: grupo de humedad (H0-H5) de lo cosechado ene-sep 2026 (suelos.json, suelos_humedad.py)
+function suelosHtml(enDoc) {
+  const G = SU.grupos, ha = G.reduce((x, g) => x + g.ha, 0) + (SU.sin_dato ? SU.sin_dato[1] : 0);
+  const pHum = 100 * G.filter(g => ['H3', 'H4', 'H5'].includes(g.g)).reduce((x, g) => x + g.ha, 0) / ha;
+  const lenta = 100 * G.filter(g => g.perm === 'lenta').reduce((x, g) => x + g.ha, 0) / ha;
+  const gH = k => G.find(g => g.g === k);
+  const seco = G[0], mojado = G[G.length - 1], masCae = G.reduce((a, g) => g.caida < a.caida ? g : a);
+  const [pm, pmh, ph, phh] = SU.pruebas;
+  const tbl = (cab, filas, num) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
+    <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const lead = `<p>Lo cosechado de enero a septiembre de 2026 está <b>${nf(pHum, 0)} % en suelos con exceso de humedad</b> (H3-H4: les sobran 400 mm de agua al año o más)
+      y ${nf(lenta, 0)} % en suelos de permeabilidad lenta, sobre todo Vertisoles. <b>A más humedad, menos TCH:</b> en 2020-25 esas mismas suertes daban ${nf(seco.historia)} TCH
+      en ${seco.g} y ${nf(mojado.historia)} en ${mojado.g}. Pero en 2026 <b>no cayeron más los suelos húmedos</b>: la caída más grande fue en ${masCae.g} (${sg(masCae.caida)} TCH),
+      donde hubo más cosecha mecanizada (${nf(masCae.mec, 0)} % del área).</p>`;
+  const t1 = tbl(['Grupo', 'Qué es', 'Cosechas', 'Área (ha)', '% del área', 'Suelo', 'Historia 2020-25', 'PPTO 2026', 'Real 2026', 'Caída (TCH)', 'Toneladas'],
+    G.map(g => [`<b>${g.g}</b>`, esc(g.def), g.cosechas, nf(g.ha, 0), nf(g.pct) + ' %', `${esc(g.orden || '')} · ${esc(g.regimen || '')} · permeabilidad ${esc(g.perm || '')}`,
+      nf(g.historia), nf(g.ppto), nf(g.real), `<b class="${clsImp(g.caida)}">${sg(g.caida)}</b>`, `<span class="${clsImp(g.t)}">${sg(g.t, 0)}</span>`])
+      .concat(SU.sin_dato ? [['Sin dato', 'La suerte no está en el estudio de suelos', SU.sin_dato[0], nf(SU.sin_dato[1], 0), nf(SU.sin_dato[2]) + ' %', '', '', '', '', '', '']] : []),
+    [2, 3, 4, 6, 7, 8, 9, 10]);
+  const CQ = [['cosecha mecanizada', 'Cosecha mecanizada'], ['corte anterior mecanizado', 'Corte anterior mecanizado'], ['suelo húmedo', 'Cosecha con suelo húmedo'],
+    ['sequía', 'Sequía al final del ciclo'], ['riego', 'Riego aplicado'], ['nivel freático', 'Nivel freático']];
+  const t2 = tbl(['Lo que le quitó o sumó (TCH)', ...G.map(g => g.g)],
+    CQ.map(([k, et]) => [et, ...G.map(g => `<span class="${clsImp(g.quito[k])}">${sg(g.quito[k])}</span>`)])
+      .concat([['% del área con cosecha mecanizada', ...G.map(g => nf(g.mec, 0) + ' %')]]), G.map((_, i) => i + 1));
+  const prueba = `<p><b>¿El tipo de suelo cambia el daño?</b> Con el mismo modelo de la caída, cada suerte frente a sí misma:</p>
+    <ul><li><b>Cosecha mecanizada:</b> resta lo mismo en suelos secos y húmedos (${sg(pm[1])} % en H0-H2; en H3-H4 la diferencia es ${sg(pmh[1])} %, p ${nf(pmh[3], 2)}).
+      El daño de la cosechadora no depende del grupo de humedad.</li>
+    <li><b>Cosechar con el suelo húmedo</b> (lluvia en el mes del corte anterior): resta ${sg(ph[1])} % por cada 100 mm en H0-H2 y <b>${sg(phh[1])} % más en H3-H4</b>
+      (p ${nf(phh[3], 2)}, casi significativo): unos ${sg(ph[1] + phh[1])} % en total. En los suelos con exceso de humedad y permeabilidad lenta, cortar con lluvia hace más daño;
+      conviene programarlos en los meses secos.</li></ul>`;
+  const h4 = gH('H4');
+  const nota = `<p${enDoc ? '' : ' class="nota"'}><b>Lo que no demuestra.</b> El grupo de humedad no cambia dentro de una suerte, así que su efecto propio sobre el TCH
+      no se puede separar de todo lo demás que tiene cada suerte: la comparación entre grupos es descriptiva.${h4 ? ` H4 son solo ${h4.cosechas} cosechas (${nf(h4.ha, 0)} ha),
+      casi sin cosecha mecanizada; su subida de ${sg(h4.caida)} TCH no es una conclusión.` : ''} Grupos del estudio de suelos (exceso de humedad en mm/año y permeabilidad);
+      coinciden con el código de la zona agroecológica del Maestro en el ${nf(SU.coinciden_za, 0)} % de las suertes.</p>`;
+  return enDoc ? `${lead}${t1}<p style="margin-top:8px"><b>Qué le quitó cada causa en cada grupo</b></p>${t2}${prueba}${nota}`
+    : `${lead}<div class="caja"><h3>Cada grupo de humedad: área, TCH y caída</h3>${t1}</div>
+       <div class="caja"><h3>TCH por grupo de humedad</h3><p class="sub" style="margin-bottom:6px">Mismas suertes: historia 2020-25 frente a 2026 (enero a septiembre)</p><div id="gSuelo"></div>
+         ${leyenda([['var(--hist)', 'Historia 2020-25'], ['var(--quita)', 'Real 2026'], ['var(--ppto)', 'PPTO 2026', true]])}</div>
+       <div class="caja"><h3>Qué le quitó cada causa en cada grupo (TCH)</h3><p class="sub" style="margin-bottom:6px">Promedio de las cosechas 2026 del grupo; negativo = le quitó</p>${t2}</div>
+       <div class="caja">${prueba}</div>${nota}`;
+}
+
+// ¿cada suerte se comportó como su grupo de humedad? Agua que sobró en el ciclo 2026 y nivel freático (humedad.json, humedad_comportamiento.py)
+function humedadHtml() {
+  if (!HU || !HU.grupos) return '';
+  const tbl = (cab, filas, num) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
+    <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const G = HU.grupos, GR = ['H0', 'H1', 'H2', 'H3', 'H4'];
+  const e26 = G.reduce((x, g) => x + g[1], 0) / G.length, enor = G.reduce((x, g) => x + g[2], 0) / G.length;
+  const h3 = G.find(g => g[0] === 'H3'), h01 = G.filter(g => g[0] === 'H0' || g[0] === 'H1'), h4 = G.find(g => g[0] === 'H4');
+  const lt01 = h01.reduce((x, g) => x + g[3], 0) / h01.length;
+  const [pGr, pExc, pNf] = HU.pruebas;
+  const pc = v => v == null ? '—' : nf(v, 0) + ' %';
+  const cruce = (c, et) => tbl([`Grupo designado → ${et}`, ...GR], c.map(r => [`<b>${r[0]}</b>`, ...r.slice(1).map((v, i) => v == null ? '' : GR[i] === r[0] ? `<b>${pc(v)}</b>` : pc(v))]), [1, 2, 3, 4, 5]);
+  const comp = filas => tbl(['Cómo se comportó', 'Cosechas', 'Área (ha)', 'Exceso 2026 (mm/año)', 'Freático a menos de 1 m', 'Historia', 'Real 2026', 'Caída (TCH)', 'Cosecha mecanizada'],
+    filas.map(r => [esc(r[0]), r[1], nf(r[2], 0), nf(r[3], 0), pc(r[4]), nf(r[5]), nf(r[6]), `<b class="${clsImp(r[7])}">${sg(r[7])}</b>`, pc(r[8])]), [1, 2, 3, 4, 5, 6, 7, 8]);
+  const bal = HU.balance, seca = bal.find(r => r[0].startsWith('más seca')), hum = bal.find(r => r[0].startsWith('más húmeda'));
+  return `<div class="caja"><h3>¿Cada suerte se comportó como su grupo de humedad?</h3>
+      <p>Se midió el agua que de verdad le sobró a cada suerte en su ciclo 2026 (del corte anterior a la cosecha) de dos formas: el <b>balance</b>, lluvia de su pluviómetro
+      menos la ETP de Cenicaña de su estación (solo los meses en que sobró, en mm por año), llevado a la misma tabla H0-H4 con la regla de permeabilidad;
+      y el <b>nivel freático</b>, qué parte de las lecturas del ciclo tuvo el agua a menos de 1 m. Se compara con su grupo designado y con sus propios ciclos 2021-25.</p>
+      ${tbl(['Grupo designado', 'Exceso 2026 (mm/año)', 'Exceso normal 2021-25 (mm/año)', 'Lecturas del freático a menos de 1 m'],
+        G.map(g => [`<b>${g[0]}</b>`, nf(g[1], 0), nf(g[2], 0), pc(g[3])]), [1, 2, 3])}
+      <ul style="margin-top:10px">
+        <li><b>La lluvia no separa los grupos; el suelo sí.</b> A todos los grupos les sobró casi la misma agua de lluvia (${nf(Math.min(...G.map(g => g[1])), 0)} a ${nf(Math.max(...G.map(g => g[1])), 0)} mm/año en 2026).
+          Lo que hace a un H3 distinto de un H1 es cuánto drena el suelo, y eso se ve en el freático: los H3 tuvieron el agua a menos de 1 m en el ${pc(h3[3])} de las lecturas,
+          contra ${pc(lt01)} en H0-H1. <b>El H3 sí se comportó como suelo húmedo.</b>${h4 ? ` H4 no (${pc(h4[3])}, menos que H3), pero son pocas cosechas.` : ''}</li>
+        <li><b>En 2026 los suelos se comportaron más secos que lo normal.</b> Les sobró en promedio ${nf(e26, 0)} mm/año, contra ${nf(enor, 0)} en sus ciclos 2021-25:
+          casi un grupo más seco que lo de costumbre en todos los grupos. Coincide con la causa «Sequía al final del ciclo».</li>
+      </ul></div>
+    <div class="caja"><h3>En qué grupo se comportó cada grupo designado (% del área)</h3>
+      <p class="sub" style="margin-bottom:6px">Por el balance de agua y la tabla del estudio de suelos (en permeabilidad lenta un escalón más húmedo). En negrilla, el área que se comportó como su grupo.</p>
+      <p style="margin:0 0 4px"><b>2026</b></p>${cruce(HU.cruce, 'se comportó en 2026')}
+      <p style="margin:10px 0 4px"><b>Sus ciclos normales 2021-25</b></p>${cruce(HU.cruce_normal, 'se comporta normalmente')}
+      <p class="sub" style="margin:6px 0 0">Con la tabla al pie de la letra, casi todo suelo de permeabilidad lenta queda en H2 o más húmedo aun si está designado H1: el estudio de suelos debió usar
+        otro balance para asignar los grupos. Por eso la señal más útil es el cambio frente a su propio normal y el freático.</p></div>
+    <div class="caja"><h3>¿Cayó más donde el suelo se comportó más húmedo?</h3>
+      <p style="margin-bottom:6px"><b>Según el balance de lluvia</b></p>${comp(HU.balance)}
+      <p style="margin:10px 0 6px"><b>Según el nivel freático</b> (frente a lo típico de su grupo designado)</p>${comp(HU.freatico)}
+      <ul style="margin-top:10px">
+        <li><b>Por la lluvia, no se ve:</b> correrse a un grupo más húmedo no explica la caída (${sg(pGr[1])} % de TCH por grupo, p ${nf(pGr[2], 2)}).
+          Las que se comportaron más secas cayeron menos (${sg(seca[7])} TCH contra ${sg(hum[7])}), pero tuvieron menos cosecha mecanizada (${pc(seca[8])} contra ${pc(hum[8])}): no se le puede atribuir al agua.</li>
+        <li><b>Por el freático, sí (casi seguro):</b> donde el agua estuvo más alta que lo normal de esa misma suerte, el TCH cayó más:
+          ${sg(pNf[1])} % por cada 10 puntos más de lecturas a menos de 1 m (p ${nf(pNf[2], 2)}). Coincide con la causa «Nivel freático» del modelo.</li>
+      </ul>
+      <p class="nota" style="margin:8px 0 0"><b>Lo que no demuestra.</b> El balance de lluvia no ve el agua que llega por escorrentía, canales o mal drenaje: ahí el freático es mejor señal.
+        La tabla del estudio de suelos es un promedio de largo plazo, no de un año. Estas comparaciones son entre suertes, con la cosecha mecanizada como control; no son el modelo completo.
+        En la ficha de cada suerte se ve cómo se comportó en 2026.</p></div>`;
+}
+
+function vSuelos() {
+  if (!SU || !SU.grupos) { $app.innerHTML = '<p>No están los datos de suelos (suelos.json).</p>'; return; }
+  const G = SU.grupos;
+  $app.innerHTML = `<div class="pila">
+    <div><h2>¿Cómo está el suelo de lo cosechado en 2026?</h2>
+      <p class="sub">Grupo de humedad del estudio de suelos: cuánta agua le sobra al suelo en el año (H0 nada, H4 más de 600 mm) y qué tan rápido la deja pasar.</p></div>
+    ${suelosHtml(false)}${humedadHtml()}</div>`;
+  grafico(document.getElementById('gSuelo'), { x: G.map(g => g.g), series: [{ valores: G.map(g => g.historia), color: 'var(--hist)', d: 1 },
+    { valores: G.map(g => g.real), color: 'var(--quita)', d: 1, etiquetas: true }, { tipo: 'linea', valores: G.map(g => g.ppto), color: 'var(--ppto)', dash: true }],
+    ymin: 80, yfmt: v => nf(v, 0) });
+}
+
 // ---------------------------------------------------------------- vista: explicación para la gerencia (documento completo, se descarga en PDF)
 // Las cifras salen de los mismos datos del informe; las de análisis aparte (alerta 2027 en t) se citan del soporte.
 function vGerencia() {
@@ -814,6 +919,8 @@ function vGerencia() {
     ${DV && DV.mismas ? `<section><h3>Desarrollo de la caña: histórico contra 2026, frente al óptimo de cada variedad</h3>
       <p>El aforo mide la caña en pie antes de la cosecha: tallos por metro (población), altura y diámetro. Comparado con el óptimo de su variedad, muestra cuánta caña había para cosechar.</p>
       ${desarrolloHtml(true)}</section>` : ''}
+    ${SU && SU.grupos ? `<section><h3>Suelos: grupo de humedad de lo cosechado en 2026</h3>
+      ${suelosHtml(true)}</section>` : ''}
 
     <section><h3>Clima, agua y nivel freático</h3>
       <p>Entre calor y sequía, el clima de 2026 quitó ${sg(-(causa('calor').t_ha + causa('sequia').t_ha))} TCH; el riego devolvió ${ap('riego')}.
@@ -940,7 +1047,8 @@ function vFicha(k) {
   $app.innerHTML = `<div class="pila">
     <a class="volver" href="#suertes">← Todas las suertes</a>
     <div class="cab"><div><h2>Suerte ${esc(s.s)}${s.k.includes('(') ? ' (segunda cosecha del mes)' : ''}</h2>
-      <div class="datos">${[s.h, s.z ? 'Zona ' + s.z : '', s.za ? 'Zona agroecológica ' + s.za : '', s.v, 'Corte ' + s.c, nf(s.a, 2) + ' ha', 'Edad ' + nf(s.ed) + ' meses']
+      <div class="datos">${[s.h, s.z ? 'Zona ' + s.z : '', s.za ? 'Zona agroecológica ' + s.za : '', SU && SU.suertes[s.s] ? `Suelo ${SU.suertes[s.s][0]} · permeabilidad ${SU.suertes[s.s][1]}` : '',
+        HU && HU.cosechas[s.s + '|' + s.m] ? `En 2026 se comportó como ${HU.cosechas[s.s + '|' + s.m][0]}` : '', s.v, 'Corte ' + s.c, nf(s.a, 2) + ' ha', 'Edad ' + nf(s.ed) + ' meses']
         .filter(Boolean).map(t => `<span class="chip">${esc(t)}</span>`).join('')}
         <span class="chip ${s.tipo === 'Mecanizada' ? 'mec' : ''}">${esc(s.tipo)} · ${corteTxt(s)}</span></div></div>
       ${otras.length ? `<div class="sub">Otra cosecha en 2026: ${otras.map(o => `<a href="${hrefS(o.k)}">${esc(o.k)}</a>`).join(', ')}</div>` : ''}</div>
@@ -1103,11 +1211,12 @@ function ruta(redibujo) {
     const on = a.dataset.v === v || (a.dataset.v === 'suertes' && v === 'suerte');
     on ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current');
   });
-  const titulo = { resumen: 'Resumen', gerencia: 'Para la gerencia', causa: 'Causas', desarrollo: 'Desarrollo de la caña', suertes: 'Suertes', suerte: 'Suerte ' + arg.split(' ')[0], prueba: 'Prueba del modelo', metodo: 'Método' }[v];
+  const titulo = { resumen: 'Resumen', gerencia: 'Para la gerencia', causa: 'Causas', desarrollo: 'Desarrollo de la caña', suelos: 'Suelos y humedad', suertes: 'Suertes', suerte: 'Suerte ' + arg.split(' ')[0], prueba: 'Prueba del modelo', metodo: 'Método' }[v];
   document.title = `${titulo ? titulo + ' · ' : ''}Caída del TCH Riopaila 2026`;
   if (v === 'causa') vCausa(arg);
   else if (v === 'gerencia') vGerencia();
   else if (v === 'desarrollo') vDesarrollo();
+  else if (v === 'suelos') vSuelos();
   else if (v === 'suertes') vSuertes();
   else if (v === 'suerte') vFicha(arg);
   else if (v === 'prueba') vPrueba();
@@ -1123,9 +1232,9 @@ window.addEventListener('hashchange', () => ruta());
 
 Promise.all(['resumen', 'causas', 'suertes', 'fichas', 'validacion', 'escenas_bloque3501'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => {
   if (!r.ok) throw new Error(`${n}.json: ${r.status}`); return r.json();
-})).concat(['desarrollo', 'balance', 'referencias'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null))))
-  .then(([r, c, s, f, v, e, d, b, rf]) => {
-    R = r; C = c; S = s; F = f; V = v; E = e; DV = d; BL = b; RF = rf;
+})).concat(['desarrollo', 'balance', 'referencias', 'suelos', 'humedad'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null))))
+  .then(([r, c, s, f, v, e, d, b, rf, su, hu]) => {
+    R = r; C = c; S = s; F = f; V = v; E = e; DV = d; BL = b; RF = rf; SU = su; HU = hu;
     if (DV) DV.filas.forEach(x => AFO[x.s + '|' + x.m] = x);
     ruta();
   })
