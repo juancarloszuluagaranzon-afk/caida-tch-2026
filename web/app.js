@@ -6,6 +6,7 @@ const $app = document.getElementById('app');
 let R, C, S, F, V, E, CAUSA, SUERTE;
 let DV = null, AFO = {};   // aforo frente al óptimo de la variedad (desarrollo.json, desarrollo_optimo.py); opcional
 let BL = null;             // balance hídrico de Cenicaña y riego aplicado en mm (balance.json, balance_riego.py); opcional
+let RF = null;             // R² del PPTO y del aforo para comparar con el del modelo (referencias.json, referencias_r2.py); opcional
 let vistaActual = '';
 
 // ---------------------------------------------------------------- formatos
@@ -812,6 +813,7 @@ function vGerencia() {
       <p>Ajustado solo con 2011-2025, sin ver 2026, el modelo predijo el <b>${nf(p.pct, 0)} %</b> de la caída, y año por año desde 2013 se movió con lo real
         (correlación ${nf(V.corr, 2)}). Un modelo que solo se acomoda a los datos no predice nada fuera de ellos. Señala bien dónde cayó más, pero se queda corto en el tamaño:
         el resto es un golpe común del año que ninguna variable medida captura.</p>
+      ${RF ? `<p><b>Suerte por suerte, comparado con el PPTO y el aforo.</b></p>${refR2Html()}` : ''}
       ${tb(['Grupo (sin ver 2026)', 'Cosechas', 'Pasó', 'Predijo'], segs.map(r => { const h = histSeg(r); return [r[1].startsWith(r[0]) ? esc(r[1]) : `${esc(r[0])}: ${esc(r[1])}`, r[2], `<span class="${clsImp(r[3])}">${sg(r[3] / 100 * h)} TCH</span>`, `${sg(r[4] / 100 * h)} TCH`]; }), [1, 2, 3])}
       <p style="margin-top:10px">${tb(['Año', ...V.anual.slice(-7).map(r => r[0])], [['Pasó (%)', ...V.anual.slice(-7).map(r => sg(r[1]) + ' %')], ['Predijo sin ver el año (%)', ...V.anual.slice(-7).map(r => sg(r[2]) + ' %')]],
         V.anual.slice(-7).map((_, i) => i + 1))}</p>
@@ -976,6 +978,26 @@ function vFicha(k) {
 }
 
 // ---------------------------------------------------------------- vista: prueba del modelo
+// el R² suerte por suerte del modelo frente al del PPTO y el aforo de campo (misma medida); lo usan Prueba y gerencia
+function refR2Html() {
+  const md = V.r2.map(r => r[1]), ppto = RF.referencias[0], af = RF.referencias[1];
+  const r2c = v => `<b class="${v < 0 ? 't-q' : ''}">${v < 0 ? '−' + nf(-v, 2) : nf(v, 2)}</b>`;
+  const filas = [
+    ['<b>Nuestro modelo</b>, sin haber visto esas suertes (sabe cómo le fue al año)', r2c(md[1] ?? md[0]), '—', '—'],
+    ['<b>Nuestro modelo</b>, sin haber visto 2026', r2c(md[0]), '—', '—'],
+    [`PPTO del Maestro de Suertes 2026 (${ppto.n} cosechas)`, r2c(ppto.r2), nf(ppto.corr2, 2), `${sg(ppto.sesgo_tch)} TCH`],
+    [`Aforo de campo, unos ${af.dias} días antes del corte (${af.n} cosechas)`, r2c(af.r2), nf(af.corr2, 2), `${sg(af.sesgo_tch)} TCH`]];
+  return `<p>El R² suerte por suerte mide qué tanto se acierta <b>cuánto cayó o subió cada suerte en 2026 frente a su propia historia</b> (por ejemplo, que una cayó
+      40 TCH y la vecina subió 10). Es la prueba más difícil, y en ella el modelo, sin haber visto esas suertes, predice mejor que los dos pronósticos que ya existen:</p>
+    <div class="tabla"><table><thead><tr><th>Predicción del cambio de cada suerte</th><th class="n">R²</th><th class="n">Ordena las suertes (r²)</th><th class="n">Sesgo frente a lo real</th></tr></thead>
+      <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${i ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <p style="margin-top:8px">Un R² negativo quiere decir que acierta peor que suponer que todas las suertes cambian igual: el PPTO y el aforo quedaron en promedio
+      ${nf(ppto.sesgo_tch)} y ${nf(af.sesgo_tch)} TCH por encima de lo real. Aun quitándoles ese sesgo y mirando solo si ordenan bien las suertes, llegan a ${nf(ppto.corr2, 2)} y ${nf(af.corr2, 2)}:
+      ni midiendo la caña en pie unos ${af.dias} días antes del corte se pasa de ~0,3. El cambio de una suerte depende mucho de lo que no se mide (plagas, compactación,
+      madurante, cómo se hizo la cosecha, la asignación de toneladas en la báscula); por eso cada ficha muestra lo «sin explicar».
+      El modelo sirve para el promedio y los grupos (año por año, correlación ${nf(V.corr, 2)}), no para diagnosticar cada suerte por separado.</p>`;
+}
+
 function vPrueba() {
   const p = prediccion(), A = V.anual;
   const acierta = A.filter(r => Math.sign(r[1]) === Math.sign(r[2]) && Math.abs(r[2]) >= 0.05).length;
@@ -988,6 +1010,7 @@ function vPrueba() {
       <div class="kpi"><div class="et">Sentido del año</div><div class="v num">${acierta} de ${A.length}</div></div>
       <div class="kpi"><div class="et">Suerte por suerte</div><div class="v num">R² ${nf(V.r2[1] ? V.r2[1][1] : V.r2[0][1], 2)}</div></div>
     </div>
+    ${RF ? `<div class="caja"><h3>¿Es bajo un R² de ${nf(V.r2[1] ? V.r2[1][1] : V.r2[0][1], 2)} suerte por suerte? Comparado con el PPTO y el aforo</h3>${refR2Html()}</div>` : ''}
     <div class="caja"><h3>Cada año predicho con un modelo que no vio ese año (% frente a los 6 años anteriores)</h3><div id="g-anual"></div>
       ${leyenda([['var(--real)', 'Lo que pasó'], ['var(--quita)', 'Lo que predijo sin ver el año']])}
       <p class="sub" style="margin-top:6px">Acierta hacia dónde va el año, pero predice menos tamaño: los años muy buenos o muy malos traen un golpe común que las variables no capturan.</p></div>
@@ -1070,9 +1093,9 @@ window.addEventListener('hashchange', () => ruta());
 
 Promise.all(['resumen', 'causas', 'suertes', 'fichas', 'validacion', 'escenas_bloque3501'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => {
   if (!r.ok) throw new Error(`${n}.json: ${r.status}`); return r.json();
-})).concat(['desarrollo', 'balance'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null))))
-  .then(([r, c, s, f, v, e, d, b]) => {
-    R = r; C = c; S = s; F = f; V = v; E = e; DV = d; BL = b;
+})).concat(['desarrollo', 'balance', 'referencias'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null))))
+  .then(([r, c, s, f, v, e, d, b, rf]) => {
+    R = r; C = c; S = s; F = f; V = v; E = e; DV = d; BL = b; RF = rf;
     if (DV) DV.filas.forEach(x => AFO[x.s + '|' + x.m] = x);
     ruta();
   })
