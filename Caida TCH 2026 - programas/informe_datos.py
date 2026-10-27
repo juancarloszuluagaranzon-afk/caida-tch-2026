@@ -6,7 +6,7 @@ Entradas (todas ya calculadas por la cadena):
   tablero_v3/suertes_caida_tch.csv (tablero_datos.py) · rio_integrado_dataset.pkl y caida_por_suerte.pkl
   (caida_integrada_rio.py) · freatico_suertes_lecturas.csv (freatico_suertes.py) · validacion_*.csv (validacion_modelo.py)
   · coeficientes del soporte v3 · Maestro Suertes 2026 (fecha exacta del corte) · clima diario de las EMA (repo
-  Precipitacion-riopaila + Meteoportal 2026) · NDVI/NDMI mensual por suerte (tch-motor/data/gee/mensual_riopaila.csv.gz).
+  Precipitacion-riopaila + Meteoportal 2026) · NDVI/NDMI/NDRE mensual por suerte (tch-motor/data/gee/mensual_riopaila.csv.gz).
 Lluvia de la ficha: la EMA que usa el modelo y, al lado, el pluviómetro más cercano (precipitacion.csv.csv del mismo repo).
 Salidas en <carpeta web>/data: resumen.json, causas.json, suertes.json, fichas.json, validacion.json.
 
@@ -308,7 +308,7 @@ def curva(ste, ini, fin):
         if f > fin + pd.Timedelta(days=15):
             break
         if f in g.index:
-            out.append([e_, r1(g.loc[f, "NDVI"], 3), r1(g.loc[f, "NDMI"], 3)])
+            out.append([e_, r1(g.loc[f, "NDVI"], 3), r1(g.loc[f, "NDMI"], 3), r1(g.loc[f, "NDRE"], 3)])   # la ficha dibuja NDRE y NDMI
     return out or None
 
 

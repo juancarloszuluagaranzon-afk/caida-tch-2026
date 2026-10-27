@@ -831,16 +831,27 @@ function vSuelos() {
 }
 
 // ---------------------------------------------------------------- satélite del ciclo: curva 2026 por edad frente a la normal propia y falta de agua (satciclo.json, satelite_ciclo.py)
-// frase de la ficha: cuánto se alejó el NDVI de la suerte de su normal propia a los 5-7 meses (meses de edad 6 y 7)
+// frase de la ficha: cuánto se alejó el NDRE de la suerte de su normal propia a los 5-7 meses (meses de edad 6 y 7)
 // una ventana de edad es «firme» si el efecto en TCH tiene el mismo signo y p < 0,05 contando la edad desde el mes siguiente al corte y desde el mes del corte
 const satFirme = x => x.tch_alt != null && Math.sign(x.tch) === Math.sign(x.tch_alt) && x.tch_p < 0.05 && x.tch_alt_p < 0.05;
 const satRango = x => sg(x.tch) === sg(x.tch_alt) ? sg(x.tch) : `${sg(Math.max(x.tch, x.tch_alt))} a ${sg(Math.min(x.tch, x.tch_alt))}`;
 // tabla de la prueba por año (normal y TCH histórico solo con cosechas anteriores a cada año)
 function satValTabla(tb) {
-  return tb(['Año', 'Cosechas', 'ha', 'TCH por cada 0,05 de NDVI por debajo de su normal', 'Rezagadas (≤ −0,02): cosechas', 'Rezagadas: caída (TCH)', 'Resto: caída (TCH)', 'Área rezagada que cayó más de 5 %'],
+  return tb(['Año', 'Cosechas', 'ha', 'TCH por cada 0,05 de NDRE por debajo de su normal', 'Rezagadas (≤ −0,02): cosechas', 'Rezagadas: caída (TCH)', 'Resto: caída (TCH)', 'Área rezagada que cayó más de 5 %'],
     SC.validacion.map(v => [`<b>${v.anio}</b>`, v.n, nf(v.ha, 0), `${sg(-v.ef)} % <small>(p ${v.p < 0.001 ? '< 0,001' : nf(v.p, 3)})</small>`, `${v.rez_n} (${nf(v.rez_ha, 0)} ha)`,
       `<b class="${clsImp(v.rez_caida)}">${sg(v.rez_caida)}</b>`, `<span class="${clsImp(v.resto_caida)}">${sg(v.resto_caida)}</span>`, `${nf(v.rez_cayo, 0)} % <small>(resto ${nf(v.resto_cayo, 0)} %)</small>`]),
     [1, 2, 3, 4, 5, 6, 7]);
+}
+
+// por qué la curva usa NDRE: la prueba por años repetida con cada índice en la misma muestra (SC.comparacion, prueba 5 de satelite_ciclo.py)
+const satCv = (v, i) => (SC.comparacion || []).find(c => c.v === v && c.ind === i) || {};
+function satComp(tb) {
+  const A = [2022, 2023, 2024, 2025], pc = v => v == null ? '—' : nf(100 * v, 0) + ' %';
+  const nom = { NDVI: 'NDVI (el de antes)', NDRE: '<b>NDRE (el que se usa)</b>', EVI: 'EVI', GNDVI: 'GNDVI', WDRVI: 'WDRVI (calculado del NDVI del mes)', NDMI: 'NDMI (humedad del follaje)' };
+  const gana = i => ['3-5', '5-7', '7-10'].reduce((a, v) => a + A.filter(y => satCv(v, i)['t' + y] > satCv(v, 'NDVI')['t' + y]).length, 0);
+  return tb(['Índice', 'Le gana al NDVI en 2022-25 (de 12: 4 años × 3 edades)', 'Para elegir: 2022-25, a los 5-7 meses', 'Sin ver 2026: 3-5 meses', '5-7 meses', '7-10 meses'],
+    ['NDVI', 'NDRE', 'EVI', 'GNDVI', 'WDRVI', 'NDMI'].filter(i => satCv('5-7', i).ind).map(i => [nom[i], i === 'NDVI' ? '—' : gana(i), pc(satCv('5-7', i).loo),
+      pc(satCv('3-5', i).r2), i === SC.ind ? `<b>${pc(satCv('5-7', i).r2)}</b>` : pc(satCv('5-7', i).r2), pc(satCv('7-10', i).r2)]), [1, 2, 3, 4, 5]);
 }
 
 // sección de «Para la gerencia»: lo que vio el satélite en el ciclo 2026 frente a la normal de cada suerte (satciclo.json)
@@ -852,26 +863,30 @@ function satDoc() {
   const tb = (cab, filas, num) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
     <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   return `<section><h3>Satélite: la caña de 2026 mes a mes desde el corte</h3>
-      <p>Con Sentinel-2 se siguió el vigor (NDVI) de ${SC.cosechas} cosechas de 2026 (${nf(SC.ha, 0)} ha), mes a mes de edad, frente a los ciclos de la misma suerte cosechados en 2020-25.</p>
+      <p>Con Sentinel-2 se siguió el vigor del follaje (NDRE, con la banda del borde rojo) de ${SC.cosechas} cosechas de 2026 (${nf(SC.ha, 0)} ha), mes a mes de edad, frente a los ciclos de la misma suerte cosechados en 2020-25.</p>
       <ul style="margin:6px 0;padding-left:20px">
         <li><b>Las suertes cuya caña se quedó atrás a los 5-7 meses fueron las que cayeron, y no solo en 2026.</b> Se probó en cada año de 2022 a 2026 con la normal y la historia
           de cada suerte tomadas solo de años anteriores, descontando la cosecha mecanizada, la edad y cómo venía el corte anterior: en los cinco años la señal sale igual (p < 0,001).
           En 2026 el quinto más rezagado cayó ${sg(q1.caida)} TCH y el más adelantado subió ${sg(q5.caida)}. Con la relación medida en 2022-25, sin ver 2026, la curva anticipa el
           ${nf(100 * F.r2, 0)} % de las diferencias de caída entre suertes de 2026 (sin la curva, ${nf(100 * F.r2_sin, 0)} %).</li>
-        <li><b>La soca del corte mecanizado arranca más despacio</b> (2019-2026, cada suerte frente a sí misma): tras el primer corte mecanizado el NDVI queda ${s3(vv('0-3').mec_ndvi)} a los 0-3 meses
-          y ${s3(v35.mec_ndvi)} a los 3-5; a los 7 meses ya se igualó. El satélite confirma el golpe a la cepa; la pérdida en toneladas la mide la báscula.</li>
+        <li><b>La soca del corte mecanizado arranca más despacio</b> (2019-2026, cada suerte frente a sí misma): tras el primer corte mecanizado el NDRE queda ${s3(vv('0-3').mec_ndre)} a los 0-3 meses
+          y ${s3(v35.mec_ndre)} a los 3-5; a los 7 meses ya se igualó. El satélite confirma el golpe a la cepa; la pérdida en toneladas la mide la báscula.</li>
         <li><b>La falta de agua de los 3 a los 10 meses resta TCH</b> (${satRango(v35)} TCH por cada 100 mm de 3 a 5 meses, ${satRango(v57)} de 5 a 7 y ${satRango(v710)} de 7 a 10, según cómo se cuente la edad).
           De 3 a 5 meses se ve en el follaje; de 7 a 10 casi no: con la caña cerrada, el agua que falta le quita altura y peso, no verdor, como mostró el aforo. En 2026 sobró agua de los 3 a los 7 meses
           y faltó de los 7 a la cosecha.</li>
-        <li><b>El promedio de 2026 no prueba nada por sí solo:</b> la caña se vio más verde que su normal hasta el mes 10 (${s3(dMed)}), porque en 2025-26 todo Riopaila se vio más verde, y quedó por debajo
-          en el mes 12 (${s3(ck(12).dif)}). Esa caída del final coincide con más falta de agua, pero antes del corte la caña también se seca por la maduración y el madurante; el satélite no separa una cosa de la otra.</li>
+        <li><b>El promedio de 2026 no prueba nada por sí solo:</b> la caña estuvo ${dMed > 0.01 ? 'por encima de' : dMed < -0.01 ? 'por debajo de' : 'en'} su normal hasta el mes 10 (${s3(dMed)}) y quedó por debajo
+          en los meses 11 y 12 (${s3(ck(11).dif)} y ${s3(ck(12).dif)}). Esa caída del final coincide con más falta de agua, pero antes del corte la caña también se seca por la maduración y el madurante; el satélite no separa una cosa de la otra.</li>
+        <li><b>Se cambió el NDVI por el NDRE.</b> El NDVI se satura cuando la caña cierra (desde los 4-5 meses se queda cerca de su techo aunque la caña siga creciendo); el NDRE usa el borde rojo
+          y se satura menos. Se repitió la misma prueba con seis índices y se escogió con 2022-25, sin mirar 2026: el NDRE le gana al NDVI en todos los años y edades.
+          Después, en 2026, anticipa el ${nf(100 * satCv('5-7', 'NDRE').r2, 0)} % frente al ${nf(100 * satCv('5-7', 'NDVI').r2, 0)} % del NDVI.</li>
       </ul>
       ${satValTabla(tb)}
+      <p class="sub" style="margin:10px 0 4px">La misma prueba con cada índice (mismas cosechas; % de las diferencias de caída entre suertes que anticipa)</p>${satComp(tb)}
       <p style="margin-top:8px"><b>Para qué sirve.</b> A los 7 meses faltan unos 5 para la cosecha: la curva frente a la normal de cada suerte es una alerta temprana para revisar en campo.
-        <b>Lo que no demuestra:</b> el NDVI mide verdor y se satura con la caña cerrada; marca qué suertes cayeron, no por qué (cosechadora, agua, plagas o manejo). No entra al modelo de la caída.</p></section>`;
+        <b>Lo que no demuestra:</b> el NDRE se satura menos que el NDVI, pero también mide el follaje, no altura ni peso; marca qué suertes cayeron, no por qué (cosechadora, agua, plagas o manejo). No entra al modelo de la caída.</p></section>`;
 }
 
-// NDVI con signo y 3 decimales (sg no pone signo por debajo de 0,005)
+// índice con signo y 3 decimales (sg no pone signo por debajo de 0,005)
 const s3 = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + nf(Math.abs(v), 3);
 function satBrecha(s) {
   const c = SC && SC.fichas && SC.fichas[s.s + '|' + s.m];
@@ -879,7 +894,7 @@ function satBrecha(s) {
   const g = [5, 6].map(i => c.v[i] != null && c.vn[i] != null ? c.v[i] - c.vn[i] : null).filter(v => v != null);
   if (!g.length) return '';
   const b = g.reduce((a, v) => a + v, 0) / g.length;
-  return `. <b>A los 5-7 meses estuvo ${s3(b)} de NDVI ${b < 0 ? 'por debajo' : 'por encima'} de su normal</b> (${c.n} ciclos 2020-25)${b <= -0.02 ? ': rezagada, como las suertes que más cayeron' : ''}. <a href="#satelite">Ver todo Riopaila</a>`;
+  return `. <b>A los 5-7 meses estuvo ${s3(b)} de NDRE ${b < 0 ? 'por debajo' : 'por encima'} de su normal</b> (${c.n} ciclos 2020-25)${b <= -0.02 ? ': rezagada, como las suertes que más cayeron' : ''}. <a href="#satelite">Ver todo Riopaila</a>`;
 }
 
 function vSatelite() {
@@ -887,71 +902,83 @@ function vSatelite() {
   const K = SC.curva, Vn = SC.ventanas, Q = SC.quintiles, F = SC.fuera, vv = id => Vn.find(x => x.v === id);
   const ck = k => K.find(x => x.k === k) || {};
   const medio = K.filter(x => x.k >= 2 && x.k <= 10), dMed = medio.reduce((a, x) => a + x.dif, 0) / medio.length;
+  const dMedV = medio.reduce((a, x) => a + x.dif_ndvi, 0) / medio.length, enN = dMed > 0.01 ? 'por encima de' : dMed < -0.01 ? 'por debajo de' : 'en';
   const q1 = Q[0], q5 = Q[Q.length - 1], v57 = vv('5-7'), v710 = vv('7-10'), v35 = vv('3-5');
   const an = SC.anual, anOtros = Object.entries(an).filter(([y]) => +y < 2025).map(([, v]) => v);
   const pp = p => p < 0.001 ? 'p < 0,001' : 'p ' + nf(p, 3);
   const tbl = (cab, filas, num) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
     <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const seVe = x => !satFirme(x) ? 'No es firme: cambia según cómo se cuente la edad' : x.ndvi_p < 0.01 && x.tch_p < 0.05 ? 'Se ve en la caña y en el TCH' : x.tch_p < 0.05 ? '<b>Resta TCH, pero el satélite casi no la ve</b> (caña cerrada)' :
-    x.ndvi_p < 0.01 ? 'Se ve en la caña; en el TCH no es confiable' : 'No es confiable';
-  const t1 = tbl(['Edad de la caña', 'Falta de agua normal 2020-25 (mm)', 'Falta 2026 (mm)', 'TCH por cada 100 mm de falta', 'NDVI por cada 100 mm de falta', 'Lectura'],
+  const seVe = x => !satFirme(x) ? 'No es firme: cambia según cómo se cuente la edad' : x.ndre_p < 0.01 && x.tch_p < 0.05 ? 'Se ve en la caña y en el TCH' : x.tch_p < 0.05 ? '<b>Resta TCH, pero el satélite casi no la ve</b> (caña cerrada)' :
+    x.ndre_p < 0.01 ? 'Se ve en la caña; en el TCH no es confiable' : 'No es confiable';
+  const t1 = tbl(['Edad de la caña', 'Falta de agua normal 2020-25 (mm)', 'Falta 2026 (mm)', 'TCH por cada 100 mm de falta', 'NDRE por cada 100 mm de falta', 'Lectura'],
     Vn.map(x => [`<b>${x.v === '10-cosecha' ? '10 meses a la cosecha' : x.v + ' meses'}</b>`, nf(x.falta_normal, 0), `<span class="${x.falta_2026 > x.falta_normal + 10 ? 't-q' : x.falta_2026 < x.falta_normal - 10 ? 't-s' : ''}">${nf(x.falta_2026, 0)}</span>`,
-      satFirme(x) ? satRango(x) : '—', `${s3(x.ndvi)} <small>(${pp(x.ndvi_p)})</small>`, seVe(x)]), [1, 2, 3, 4]);
-  const t2 = tbl(['Quinto de las cosechas 2026', 'Cosechas', 'ha', 'NDVI a los 5-7 meses frente a su normal', 'Historia 2020-25', 'Real 2026', 'Caída (TCH)', 'Cosecha mecanizada'],
+      satFirme(x) ? satRango(x) : '—', `${s3(x.ndre)} <small>(${pp(x.ndre_p)})</small>`, seVe(x)]), [1, 2, 3, 4]);
+  const t2 = tbl(['Quinto de las cosechas 2026', 'Cosechas', 'ha', 'NDRE a los 5-7 meses frente a su normal', 'Historia 2020-25', 'Real 2026', 'Caída (TCH)', 'Cosecha mecanizada'],
     Q.map((x, i) => [i === 0 ? '<b>1 · las más rezagadas</b>' : i === Q.length - 1 ? `<b>${x.q} · las más adelantadas</b>` : String(x.q), x.n, nf(x.ha, 0), s3(x.brecha), nf(x.hist), nf(x.real),
       `<b class="${clsImp(x.caida)}">${sg(x.caida)}</b>`, nf(x.mec, 0) + ' %']), [1, 2, 3, 4, 5, 6, 7]);
   $app.innerHTML = `<div class="pila">
     <div><h2>¿Qué vio el satélite en la caña de 2026, mes a mes desde el corte?</h2>
-      <p class="sub">Vigor (NDVI) y humedad del follaje (NDMI) de Sentinel-2 de cada cosecha de enero a septiembre de 2026, por mes de edad, frente a los ciclos de la misma suerte
+      <p class="sub">Vigor del follaje (NDRE, con la banda del borde rojo) y humedad del follaje (NDMI) de Sentinel-2 de cada cosecha de enero a septiembre de 2026, por mes de edad, frente a los ciclos de la misma suerte
       cosechados en 2020-25 a la misma edad. ${SC.cosechas} de ${SC.cosechas_2026} cosechas (${nf(SC.ha, 0)} ha) tienen al menos dos ciclos propios para comparar.</p></div>
     <div class="kpis">
-      <div class="kpi subio"><div class="et">Meses 2 a 10</div><div class="v num">${s3(dMed)} <small>NDVI</small></div><div class="pie">más verde que su normal propia</div></div>
-      <div class="kpi caida"><div class="et">Mes 12, antes de cosechar</div><div class="v num">${s3(ck(12).dif)} <small>NDVI</small></div><div class="pie">por debajo de su normal (${nf(ck(12).bajo, 0)} % del área)</div></div>
+      <div class="kpi${dMed > 0.01 ? ' subio' : dMed < -0.01 ? ' caida' : ''}"><div class="et">Meses 2 a 10</div><div class="v num">${s3(dMed)} <small>NDRE</small></div><div class="pie">${enN} su normal propia</div></div>
+      <div class="kpi caida"><div class="et">Mes 12, antes de cosechar</div><div class="v num">${s3(ck(12).dif)} <small>NDRE</small></div><div class="pie">por debajo de su normal (${nf(ck(12).bajo, 0)} % del área)</div></div>
       <div class="kpi caida"><div class="et">Las más rezagadas a los 5-7 meses</div><div class="v num">${sg(q1.caida)} <small>TCH</small></div><div class="pie">las más adelantadas: ${sg(q5.caida)} TCH</div></div>
       <div class="kpi"><div class="et">Probada en otros años</div><div class="v num">${SC.validacion.filter(v => v.p < 0.01).length} de ${SC.validacion.length} <small>años</small></div><div class="pie">sin ver 2026 anticipa el ${nf(100 * F.r2, 0)} % (sin la curva ${nf(100 * F.r2_sin, 0)} %)</div></div>
     </div>
     <div class="caja"><h3>La curva de 2026 frente a la normal de cada suerte</h3>
-      <p><b>Hasta el mes 10 la caña de 2026 se vio igual o más verde que en sus ciclos anteriores</b> (${s3(dMed)} de NDVI en promedio). Solo en el mes 12 quedó por debajo
-        (la humedad del follaje, NDMI, desde el mes 11), cuando la falta de agua de 2026 subió (mes 11: ${nf(ck(11).falta, 0)} mm frente a ${nf(ck(11).falta_n, 0)} normal; mes 12: ${nf(ck(12).falta, 0)} frente a ${nf(ck(12).falta_n, 0)}).
+      <p><b>Hasta el mes 10 la caña de 2026 estuvo ${enN} su normal</b> (${s3(dMed)} de NDRE en promedio; el NDVI la mostraba más verde, ${s3(dMedV)}).
+        En los meses 11 y 12 quedó por debajo (${s3(ck(11).dif)} y ${s3(ck(12).dif)}; la humedad del follaje, NDMI, también desde el mes 11), cuando la falta de agua de 2026 subió (mes 11: ${nf(ck(11).falta, 0)} mm frente a ${nf(ck(11).falta_n, 0)} normal; mes 12: ${nf(ck(12).falta, 0)} frente a ${nf(ck(12).falta_n, 0)}).
         Coincide con la causa <a href="#causa/clima">«Calor y sequía al final del ciclo»</a>, pero <b>no la prueba</b>: antes del corte la caña también se seca por la maduración y el madurante,
-        y el satélite no separa una cosa de la otra. Y en 2025-26 todo Riopaila se vio más verde (NDVI promedio ${nf(an[2025], 3)} y ${nf(an[2026], 3)} frente a
-        ${nf(Math.min(...anOtros), 3)}-${nf(Math.max(...anOtros), 3)} en 2019-24), así que verde no es lo mismo que toneladas. Lo firme está en las dos secciones siguientes.</p>
-      <div id="gSatC"></div>${leyenda([['var(--quita)', 'NDVI 2026'], ['var(--hist)', 'NDVI normal propio (ciclos 2020-25)', 1]])}
+        y el satélite no separa una cosa de la otra. Con el NDVI, todo Riopaila se veía más verde en 2025-26; con el NDRE ${Math.max(an[2025], an[2026]) <= Math.max(...anOtros) ? 'no' : 'también'}
+        (promedio ${nf(an[2025], 3)} y ${nf(an[2026], 3)} frente a ${nf(Math.min(...anOtros), 3)}-${nf(Math.max(...anOtros), 3)} en 2019-24). En todo caso, verde no es lo mismo que toneladas:
+        lo firme está en las secciones siguientes.</p>
+      <div id="gSatC"></div>${leyenda([['var(--quita)', 'NDRE 2026'], ['var(--hist)', 'NDRE normal propio (ciclos 2020-25)', 1]])}
       <p class="sub" style="margin:10px 0 4px">Falta de agua de cada mes de edad (0,8 × evaporación − lluvia, mm)</p>
       <div id="gSatF"></div>${leyenda([['var(--quita)', 'Falta 2026'], ['var(--hist)', 'Falta normal de esas suertes']])}</div>
     <div class="caja"><h3>¿En qué edad hace daño la falta de agua?</h3>
       <p>Cada suerte frente a sí misma: cuánto TCH resta cada 100 mm de falta de agua según la edad de la caña (${nf(SC.n_tch, 0)} cosechas 2011-2026, con los mismos controles del modelo)
-        y cuánto baja el NDVI de esa edad (${nf(SC.ciclos_sat, 0)} ciclos con satélite desde 2019).</p>${t1}
+        y cuánto baja el NDRE de esa edad (${nf(SC.ciclos_sat, 0)} ciclos con satélite desde 2019).</p>${t1}
       <p style="margin-top:8px">El TCH va como rango: se midió contando la edad desde el mes siguiente al corte y desde el mes del corte. De 0 a 3 meses y del mes 10 a la cosecha
         el resultado cambia con esa elección (de signo o de confiabilidad), así que no se toma como firme.
         De 3 a 5 meses la falta de agua <b>se ve en la caña y resta TCH</b> (${satRango(v35)} TCH por 100 mm): es cuando la caña está cerrando.
-        De 7 a 10 meses <b>también resta (${satRango(v710)} TCH)</b>, pero el satélite apenas lo ve (${s3(v710.ndvi)} de NDVI, ${pp(v710.ndvi_p)}): con la caña cerrada, la falta de agua
+        De 7 a 10 meses <b>también resta (${satRango(v710)} TCH)</b>, pero el satélite apenas lo ve (${s3(v710.ndre)} de NDRE, ${pp(v710.ndre_p)}): con la caña cerrada, la falta de agua
         no le quita verdor sino altura y peso. Coincide con el aforo: en 2026 la caña llegó más baja que en su historia (<a href="#desarrollo">Desarrollo de la caña</a>).
         En 2026 la falta de los meses 3 a 7 fue <b>menor</b> que lo normal; la de más vino de los 7 meses a la cosecha.</p></div>
     <div class="caja"><h3>Las suertes cuya caña se quedó atrás a los 5-7 meses son las que cayeron</h3>
-      <p>Se ordenaron las cosechas 2026 por cuánto se alejó su NDVI de su normal propia a los 5-7 meses y se partieron en cinco grupos del mismo tamaño.
-        Las más rezagadas cayeron <b>${sg(q1.caida)} TCH</b>; las más adelantadas subieron ${sg(q5.caida)}. La cosecha mecanizada es parecida en todos los grupos
+      <p>Se ordenaron las cosechas 2026 por cuánto se alejó su NDRE de su normal propia a los 5-7 meses y se partieron en cinco grupos del mismo tamaño.
+        Las más rezagadas cayeron <b>${sg(q1.caida)} TCH</b>; las más adelantadas subieron ${sg(q5.caida)}. La cosecha mecanizada no cambia mucho entre los grupos
         (${nf(Math.min(...Q.map(x => x.mec)), 0)}-${nf(Math.max(...Q.map(x => x.mec)), 0)} %), así que la señal no es solo la cosechadora.</p>${t2}
       <p style="margin-top:12px"><b>¿Pasa solo en 2026? No: se probó en cada año de 2022 a 2026.</b> Para cada año, la normal satelital y la historia de TCH de cada suerte salen solo de años anteriores
         (nada de ese año ni de después), y se descuentan la cosecha mecanizada, la edad y cómo venía el corte anterior frente a su historia (para que una suerte que venía de un mal corte
         no parezca mejorar solo por volver a su nivel). En los cinco años la señal sale con el mismo sentido y p < 0,001, en años de mucha caída (2023) y de subida (2025):</p>${satValTabla(tbl)}
-      <p style="margin-top:8px"><b>Predicción sin ver 2026:</b> con la relación medida en 2022-25 (${sg(-F.ef)} % de TCH por cada 0,05 de NDVI por debajo), aplicada a las cosechas de 2026, la curva anticipa el
+      <p style="margin-top:8px"><b>Predicción sin ver 2026:</b> con la relación medida en 2022-25 (${sg(-F.ef)} % de TCH por cada 0,05 de NDRE por debajo), aplicada a las cosechas de 2026, la curva anticipa el
         <b>${nf(100 * F.r2, 0)} %</b> de las diferencias de caída entre suertes; la cosecha mecanizada, la edad y el corte anterior solos anticipan el ${nf(100 * F.r2_sin, 0)} %.
         A los 7 meses todavía faltan unos 5 para la cosecha: <b>la curva sirve de alerta temprana</b> para revisar esas suertes en campo.</p></div>
+    <div class="caja"><h3>¿Por qué NDRE y no NDVI?</h3>
+      <p>El NDVI compara el rojo con el infrarrojo cercano. Cuando la caña cierra (desde los 4-5 meses), las hojas de arriba absorben casi todo el rojo y el NDVI se queda cerca de su techo
+        aunque la caña siga creciendo: se <b>satura</b>. El NDRE usa en lugar del rojo la banda del <b>borde rojo</b> (Sentinel-2, banda 5), que entra más en el follaje cerrado y sigue marcando diferencias.</p>
+      <p style="margin-top:6px">Se repitió la misma prueba por años con seis índices, en las mismas cosechas. <b>Para no escoger con 2026</b>, la elección se hizo solo con 2022-25: la fuerza de la señal en cada año
+        y cuánto anticipa cada año cuando se lo deja por fuera. El NDRE le gana al NDVI en los 12 casos (4 años × 3 edades). Después, sin ver 2026, anticipa el
+        <b>${nf(100 * satCv('5-7', 'NDRE').r2, 0)} %</b> de las diferencias de caída frente al ${nf(100 * satCv('5-7', 'NDVI').r2, 0)} % del NDVI, y la mejora es mayor de 7 a 10 meses,
+        cuando la caña está más cerrada (${nf(100 * satCv('7-10', 'NDRE').r2, 0)} % frente a ${nf(100 * satCv('7-10', 'NDVI').r2, 0)} %).</p>${satComp(tbl)}
+      <p style="margin-top:8px">El <b>EVI</b> era el mejor con 2022-25, pero en 2026 no mejoró al NDVI: usa la banda azul, sensible a la bruma, así que no se tomó.
+        El <b>WDRVI</b> aquí sale del NDVI del mes (no de las bandas), por eso mejora poco. El <b>NDMI</b> empata con el NDRE en 2026, pero mide la humedad del follaje y ya se usa aparte.
+        Las cosechas más rezagadas son casi las mismas con cualquier índice; el NDRE ordena mejor a las demás. El NDVI y los demás índices quedan en el Excel como comparación.</p></div>
     <div class="caja"><h3>La soca después del corte mecanizado arranca más despacio</h3>
-      <p class="sub" style="margin-bottom:6px">Diferencia de NDVI frente a la normal propia, según cómo fue el corte anterior (${SC.por_ant.man} cosechas tras corte manual, ${SC.por_ant.new} tras el primero mecanizado, ${SC.por_ant.seg} tras dos mecanizados)</p>
+      <p class="sub" style="margin-bottom:6px">Diferencia de NDRE frente a la normal propia, según cómo fue el corte anterior (${SC.por_ant.man} cosechas tras corte manual, ${SC.por_ant.new} tras el primero mecanizado, ${SC.por_ant.seg} tras dos mecanizados)</p>
       <div id="gSatA"></div>${leyenda([['var(--hist)', 'Corte anterior manual', 1], ['var(--quita)', 'Primer corte mecanizado'], ['var(--mec)', 'Dos cortes mecanizados seguidos']])}
       <p style="margin-top:8px"><b>Con todos los ciclos 2019-2026</b>, cada suerte frente a sí misma y descontando año, mes de inicio, falta de agua y etapa de la soca: tras el primer corte mecanizado
-        el NDVI queda ${s3(vv('0-3').mec_ndvi)} a los 0-3 meses, ${s3(vv('3-5').mec_ndvi)} a los 3-5 y ${s3(vv('5-7').mec_ndvi)} a los 5-7 (p < 0,05 en los tres); de los 7 meses en adelante ya no hay diferencia.
-        En 2026 se ve igual: tras un corte manual la caña estuvo ${s3(ck(5).dif_man)} sobre su normal en los meses 3 a 6 y tras uno mecanizado casi en su normal (${s3(ck(5).dif_new)}).
+        el NDRE queda ${s3(vv('0-3').mec_ndre)} a los 0-3 meses, ${s3(vv('3-5').mec_ndre)} a los 3-5 y ${s3(vv('5-7').mec_ndre)} a los 5-7 (p < 0,05 en los tres); de los 7 meses en adelante ya no hay diferencia.
+        En 2026 se ve igual: tras un corte manual la caña estuvo ${s3(ck(5).dif_man)} sobre su normal en los meses 3 a 6 y tras uno mecanizado ${ck(5).dif_new < -0.01 ? 'por debajo' : 'casi en su normal'} (${s3(ck(5).dif_new)}).
         El satélite confirma el golpe a la cepa en la primera mitad del ciclo; la pérdida en toneladas la mide la báscula.</p></div>
-    <p class="nota"><b>Lo que no demuestra.</b> El NDVI mide verdor del follaje y se satura cuando la caña cierra (desde el mes 5-6): no mide altura ni peso, por eso no reemplaza la báscula ni el aforo.
+    <p class="nota"><b>Lo que no demuestra.</b> El NDRE se satura menos que el NDVI cuando la caña cierra, pero también mide el follaje: no mide altura ni peso, por eso no reemplaza la báscula ni el aforo.
       La curva marca <b>qué</b> suertes cayeron (probado en 2022-2026), pero no dice <b>por qué</b>: una caña rezagada puede venir de la cosechadora, del agua, de plagas o del manejo. La normal propia sale de 2 a 6 ciclos
       y la falta de agua es la de la EMA de la suerte, no la del pluviómetro. Respalda la cosecha mecanizada y el efecto de la falta de agua por edad; no entra al modelo de la caída. Programa: satelite_ciclo.py.</p>
   </div>`;
   const x = K.map(c => String(c.k));
-  grafico(document.getElementById('gSatC'), { x, series: [{ tipo: 'linea', valores: K.map(c => c.ndvi_n), color: 'var(--hist)', dash: true, d: 3 },
-    { tipo: 'linea', valores: K.map(c => c.ndvi), color: 'var(--quita)', grosor: 3, d: 3 }], ymin: 0.2, ymax: 0.85, nt: 5, yfmt: v => nf(v, 2), ejeX: 'meses de edad', alto: 230, anchoEt: 24 });
+  grafico(document.getElementById('gSatC'), { x, series: [{ tipo: 'linea', valores: K.map(c => c.ndre_n), color: 'var(--hist)', dash: true, d: 3 },
+    { tipo: 'linea', valores: K.map(c => c.ndre), color: 'var(--quita)', grosor: 3, d: 3 }], ymin: 0.1, ymax: 0.65, nt: 5, yfmt: v => nf(v, 2), ejeX: 'meses de edad', alto: 230, anchoEt: 24 });
   grafico(document.getElementById('gSatF'), { x, series: [{ valores: K.map(c => c.falta), color: 'var(--quita)', d: 0 }, { valores: K.map(c => c.falta_n), color: 'var(--hist)', d: 0 }],
     ymin: 0, yfmt: v => nf(v, 0), ejeX: 'meses de edad', alto: 170, anchoEt: 24 });
   grafico(document.getElementById('gSatA'), { x, series: [{ tipo: 'linea', valores: K.map(c => c.dif_man), color: 'var(--hist)', dash: true, d: 3 },
@@ -1144,7 +1171,7 @@ function vGerencia() {
     <section><h3>Qué proponemos</h3><ol style="margin:0;padding-left:20px">
       <li><b>Revisar la cosecha mecanizada:</b> el daño a la cepa, sobre todo donde se repite el corte mecanizado, y evitar cortar con el suelo húmedo. Revisar en campo,
         antes de la cosecha 2027, las suertes de la alerta que rebrotaron peor.</li>
-      ${SC ? '<li><b>Usar la curva satelital como alerta temprana:</b> cada mes, marcar las suertes de 5 a 7 meses cuyo NDVI está por debajo de su propia normal y revisarlas en campo.</li>' : ''}
+      ${SC ? '<li><b>Usar la curva satelital como alerta temprana:</b> cada mes, marcar las suertes de 5 a 7 meses cuyo NDRE está por debajo de su propia normal y revisarlas en campo.</li>' : ''}
       <li><b>Armar el presupuesto 2027 desde el histórico de cada suerte</b>, ajustado por tipo de cosecha y edad.</li>
       <li><b>Seguir la caída mes a mes</b> con el mismo modelo y la misma prueba; medir el madurante y el desarrollo de la caña con el aforo de cada mes.</li>
       <li><b>Conectar el Registro de NF</b> como fuente fija para el nivel freático.</li>
@@ -1166,7 +1193,7 @@ function vGerencia() {
         ['Déficit de agua y riego', 'Histórico de riego por suerte y evaporación de las EMA', '2022'],
         ['Nivel freático', 'Registro de NF de Ingeniería Agrícola, 202 pozos', 'oct-2020'],
         ['Roturación, herbicida, fertilización', 'Control de roturación, bases de aplicaciones y SimpleAgri', '2024'],
-        ['NDVI y NDMI', 'Sentinel-2 por Earth Engine, promedio mensual por suerte', '2019'],
+        ['NDVI, NDRE y NDMI', 'Sentinel-2 por Earth Engine, promedio mensual por suerte', '2019'],
         ['Balance hídrico (soporte)', 'Clima mensual de Cenicaña por estación: lluvia y evaporación', '1993'],
         ['Riego aplicado en mm (soporte)', 'Consolidado de riegos del balance hídrico', '2021'],
         ['Aforo (población, altura, diámetro)', 'Base de aforos y tabla de óptimos por variedad', '2023'],
@@ -1249,7 +1276,7 @@ function vFicha(k) {
       <div class="caja"><h3>Nivel freático (m de profundidad)</h3>
         <p class="sub" style="margin-bottom:6px">${f.fre && f.fre.l.length ? `Lecturas interpoladas a la suerte; pozo más cercano ${f.fre.pozo} a ${nf(f.fre.dist, 0)} m. Arriba = agua más superficial.` : 'Sin pozo de observación con lecturas cerca de esta suerte.'}</p>
         <div id="g-nf"></div></div>
-      <div class="caja"><h3>Satélite: vigor (NDVI) por mes de edad</h3><p class="sub" style="margin-bottom:6px">Ciclo 2026 frente a los ciclos anteriores de la misma suerte (Sentinel-2, meses despejados)${satBrecha(s)}</p>
+      <div class="caja"><h3>Satélite: vigor del follaje (NDRE) por mes de edad</h3><p class="sub" style="margin-bottom:6px">Ciclo 2026 frente a los ciclos anteriores de la misma suerte (Sentinel-2, meses despejados)${satBrecha(s)}</p>
         <div id="g-ndvi"></div><div id="ley-sat"></div><h3 style="margin-top:10px">Humedad del follaje (NDMI)</h3><div id="g-ndmi"></div></div>
     </div>
     ${afoFicha(s)}
@@ -1286,7 +1313,7 @@ function vFicha(k) {
     const x = Array.from({ length: 14 }, (_, i) => String(i));
     const colorC = c => c === '2026' ? 'var(--quita)' : (f.sat_tipo[c] === 'Mec' ? 'var(--mec)' : 'var(--hist)');
     const serie = (c, j) => ({ tipo: 'linea', valores: x.map((_, i) => (f.sat[c].find(p => p[0] === i) || [])[j] ?? null), color: colorC(c), grosor: c === '2026' ? 3 : 1.6, dash: c !== '2026', d: 2 });
-    grafico(document.getElementById('g-ndvi'), { x, series: ciclos.map(c => serie(c, 1)), ymin: 0, ymax: 1, nt: 5, yfmt: v => nf(v, 1), ejeX: 'meses de edad', alto: 190, anchoEt: 24 });
+    grafico(document.getElementById('g-ndvi'), { x, series: ciclos.map(c => serie(c, 3)), ymin: 0, ymax: 0.7, nt: 5, yfmt: v => nf(v, 1), ejeX: 'meses de edad', alto: 190, anchoEt: 24 });
     grafico(document.getElementById('g-ndmi'), { x, series: ciclos.map(c => serie(c, 2)), ymin: -0.3, ymax: 0.6, nt: 5, yfmt: v => nf(v, 1), ejeX: 'meses de edad', alto: 170, anchoEt: 24 });
     document.getElementById('ley-sat').innerHTML = leyenda(ciclos.map(c => [colorC(c), c === '2026' ? 'Ciclo cosechado en 2026' : `Ciclo cosechado en ${c} (corte ${f.sat_tipo[c] === 'Mec' ? 'mecanizado' : 'manual'})`, 1]));
   } else document.getElementById('g-ndvi').innerHTML = '<p class="sub">Sin imágenes despejadas para esta suerte.</p>';
@@ -1361,7 +1388,7 @@ function vMetodo() {
       <tr><td>Nivel freático</td><td>Registro de NF de Ingeniería Agrícola: 202 pozos, lecturas quincenales, interpoladas a cada suerte (pozos a menos de 1,5 km)</td><td>oct-2020</td></tr>
       <tr><td>Roturación, herbicida, fertilización</td><td>Control de roturación, bases de aplicaciones y SimpleAgri</td><td>2024</td></tr>
       <tr><td>Renovación no hecha</td><td>Plan de renovación 2025</td><td>2025</td></tr>
-      <tr><td>NDVI y NDMI</td><td>Sentinel-2 (Earth Engine), promedio mensual de cada suerte</td><td>2019</td></tr>
+      <tr><td>NDVI, NDRE y NDMI</td><td>Sentinel-2 (Earth Engine), promedio mensual de cada suerte</td><td>2019</td></tr>
       <tr><td>PPTO, zona, hacienda, fecha de corte</td><td>Maestro de Suertes 2026</td><td>—</td></tr>
     </tbody></table></div></div>
     <div class="caja"><h3>Qué cambió frente a la versión anterior</h3><ul style="margin:0;padding-left:20px">
