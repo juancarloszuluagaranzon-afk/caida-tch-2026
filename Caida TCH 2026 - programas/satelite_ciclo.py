@@ -65,7 +65,7 @@ TN = float(np.average(ref.tch_calc, weights=ref.Area))
 filas = []
 for x in d.itertuples():
     p0, pc = x.ini.to_period("M"), x.cosecha.to_period("M")
-    for k in range(1, 25):
+    for k in range(0, 25):      # k = 0 (mes del corte) solo para la definición alterna de las ventanas
         f = p0 + k
         if f >= pc:
             break
@@ -96,6 +96,16 @@ for v, c in zip(VENT, FV.columns):
     ventanas.append({"v": v, "tch_pct": r1(pct, 2), "tch": r1(pct / 100 * TN, 2), "tch_p": r1(ft.pvalues[c], 3),
                      "falta_normal": r1(fn, 0), "falta_2026": r1(f6, 0), "aporte": r1(pct / 100 * TN * (f6 - fn) / 100, 2)})
 print(f"1) TCH por 100 mm de falta (n {int(ft.nobs)}):", [(x["v"], x["tch"], x["tch_p"]) for x in ventanas])
+# sensibilidad: la misma prueba contando el mes del corte como edad 0 (ventanas un mes antes)
+L["v2"] = pd.cut(L.k, CORTES, labels=VENT, right=False)
+F2 = L.groupby(["i", "v2"], observed=True).falta.agg(lambda z: z.sum() / 100 if z.notna().all() else np.nan).unstack()
+F2.columns = ["f_" + c.replace("-", "_") for c in F2.columns]
+D2 = d.join(F2).dropna(subset=list(F2.columns))
+mo = smf.wls("y ~ C(ste) + C(anio) + C(Mes) + C(edad_b) + C(soca_b) + C(var) + inc + Corte + mec + d32 + " + FX, data=D2, weights=D2.Area)
+f2 = mo.fit(cov_type="cluster", cov_kwds={"groups": pd.factorize(D2.loc[mo.data.row_labels, "ste"])[0]})
+for x, c in zip(ventanas, FV.columns):
+    x["tch_alt"], x["tch_alt_p"] = r1((np.exp(f2.params[c]) - 1) * TN, 2), r1(f2.pvalues[c], 3)
+print("   contando el mes del corte:", [(x["v"], x["tch_alt"], x["tch_alt_p"]) for x in ventanas])
 
 # ---------------------------------------------------------------- 2) satélite: ¿la falta de agua de la ventana se ve en el índice? (2019-2026)
 P = L[L.NDVI.notna() | L.NDMI.notna()].groupby(["i", "v"], observed=True).agg(N=("NDVI", "mean"), M=("NDMI", "mean"), F=("falta", "sum")).reset_index()
@@ -107,6 +117,8 @@ for x in ventanas:
         mo = smf.wls(f"{ind} ~ F100 + C(ste) + C(anio) + C(mi) + pm_new + pm_seg + C(soca_b)", data=q, weights=q.Area)
         f = mo.fit(cov_type="cluster", cov_kwds={"groups": pd.factorize(q.loc[mo.data.row_labels, "ste"])[0]})
         x[et], x[et + "_p"], x[et + "_n"] = r1(f.params["F100"], 4), r1(f.pvalues["F100"], 3), int(f.nobs)
+        if ind == "N":   # cuánto más bajo queda el NDVI de esa edad después del primer corte mecanizado (2019-2026)
+            x["mec_ndvi"], x["mec_p"] = r1(f.params["pm_new"], 4), r1(f.pvalues["pm_new"], 3)
 print("2) índice por 100 mm de falta:", [(x["v"], x["ndvi"], x["ndvi_p"], x["ndmi"], x["ndmi_p"]) for x in ventanas])
 
 # ---------------------------------------------------------------- curva 2026 frente a la normal propia
@@ -172,7 +184,47 @@ for i, g in E12.groupby("i"):
     fichas[f"{S.at[i, 's']}|{int(S.at[i, 'm'])}"] = {"n": int(nprev.get(d.at[i, "ste"], 0)), "v": [r1(z, 3) for z in g.NDVI], "vn": [r1(z, 3) for z in g.NDVI_n],
                                                     "f": [r1(z, 0) for z in g.falta], "fn": [r1(z, 0) for z in g.falta_n]}
 
-out = {"tch_base": r1(TN), "etc": ETC, "cosechas": int(A.i.nunique()), "cosechas_2026": int(len(c26)), "ha": r1(d.loc[A.i.unique(), "Area"].sum(), 0),
+# ---------------------------------------------------------------- 4) prueba con años que no se usaron: ¿la brecha a los 5-7 meses anticipa la caída?
+# Para cada año Y: normal satelital y TCH histórico (6 años) solo con cosechas ANTERIORES a Y; controles: cosecha mecanizada,
+# edad y el corte anterior frente a su historia (descuenta la vuelta a la media de una suerte que venía de un mal corte).
+def anio_val(Y):
+    c = d[(d.anio == Y) & d.Mes.between(1, 9)]
+    pv = L[L.anio.between(2020, Y - 1) & L.NDVI.notna()]
+    n = pv.groupby("ste").i.nunique()
+    a = L[L.i.isin(c.index) & L.k.isin([6, 7]) & L.NDVI.notna()].join(pv.groupby(["ste", "k"]).NDVI.mean().rename("nor"), on=["ste", "k"]).dropna(subset=["nor"])
+    a = a[a.ste.map(n).fillna(0) >= 2]
+    H = d[d.anio.between(Y - 6, Y - 1)]
+    hi = (H.tch_calc * H.Area).groupby(H.ste).sum() / H.Area.groupby(H.ste).sum()
+    z = c.join((a.NDVI - a.nor).groupby(a.i).mean().rename("gap"), how="inner").assign(hist=lambda t: t.ste.map(hi),
+                                                                                        ult=lambda t: t.ste.map(H.sort_values("cosecha").groupby("ste").tch_calc.last()))
+    z = z.dropna(subset=["hist", "ult"])
+    return z.assign(caida=100 * (z.tch_calc / z["hist"] - 1), ult_rel=100 * (z.ult / z["hist"] - 1), Y=Y)
+
+
+FC = "caida ~ gap + mec + Edad + ult_rel"
+val = []
+for Y in range(2022, 2027):
+    z = anio_val(Y)
+    rc = smf.wls(FC, data=z, weights=z.Area).fit(cov_type="HC1")
+    r0 = smf.wls("caida ~ mec + Edad + ult_rel", data=z, weights=z.Area).fit(cov_type="HC1")
+    rz, rs = z[z.gap <= -0.02], z[z.gap > -0.02]
+    dt = lambda g: wm(g, "tch_calc") - wm(g, "hist")  # noqa: E731
+    cayo = lambda g: 100 * float(np.average(g.caida < -5, weights=g.Area))  # noqa: E731
+    val.append({"anio": Y, "n": int(len(z)), "ha": r1(z.Area.sum(), 0), "caida": r1(dt(z)), "ef": r1(rc.params["gap"] * 0.05, 1), "p": r1(rc.pvalues["gap"], 4),
+                "r2_sin": r1(r0.rsquared, 2), "r2": r1(rc.rsquared, 2), "rez_n": int(len(rz)), "rez_ha": r1(rz.Area.sum(), 0), "rez_caida": r1(dt(rz)),
+                "rez_cayo": r1(cayo(rz), 0), "resto_caida": r1(dt(rs)), "resto_cayo": r1(cayo(rs), 0)})
+print("4) por año:", [(x["anio"], x["ef"], x["p"], x["rez_caida"], x["resto_caida"]) for x in val])
+Zv = pd.concat([anio_val(Y) for Y in range(2022, 2026)])
+z6 = anio_val(2026)
+rp = smf.wls(FC + " + C(Y)", data=Zv, weights=Zv.Area).fit(cov_type="cluster", cov_kwds={"groups": pd.factorize(Zv.ste)[0]})
+r0 = smf.wls("caida ~ mec + Edad + ult_rel + C(Y)", data=Zv, weights=Zv.Area).fit()
+pr = lambda b, ks: sum(b[k] * z6[k] for k in ks)  # noqa: E731
+r2p = lambda p: float(np.corrcoef(p, z6.caida)[0, 1] ** 2)  # noqa: E731
+fuera = {"ef": r1(rp.params["gap"] * 0.05, 1), "p": r1(rp.pvalues["gap"], 4), "n": int(len(z6)),
+         "r2": r1(r2p(pr(rp.params, ["gap", "mec", "Edad", "ult_rel"])), 2), "r2_sin": r1(r2p(pr(r0.params, ["mec", "Edad", "ult_rel"])), 2)}
+print("   2022-25 → 2026 sin ver 2026:", fuera)
+
+out = {"tch_base": r1(TN), "etc": ETC, "validacion": val, "fuera": fuera, "cosechas": int(A.i.nunique()), "cosechas_2026": int(len(c26)), "ha": r1(d.loc[A.i.unique(), "Area"].sum(), 0),
        "ciclos_sat": int(P.i.nunique()), "n_tch": int(ft.nobs), "anual": {int(k): r1(v, 3) for k, v in anual.items()},
        "curva": curva, "ventanas": ventanas, "junto": junto, "quintiles": quint, "por_ant": por_ant, "fichas": fichas}
 json.dump(out, open(WEB / "data" / "satciclo.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
