@@ -99,7 +99,7 @@ def g26(g):
            "caída TCH": w(g, "real") - w(g, "hist"), "t perdidas": float(((g["real"] - g["hist"]) * g.a).sum()),
            "PPTO": w(g.dropna(subset=["ppto"]), "ppto"), "% cosecha mecanizada": 100 * float(np.average(g.tipo == "Mecanizada", weights=g.a))}
     for k, et in (("mecanica", "cosecha mecanizada"), ("corte-humedo", "suelo húmedo"), ("freatico", "nivel freático"),
-                  ("clima", "calor y sequía"), ("riego", "riego"), ("corte-anterior", "corte anterior mecanizado")):
+                  ("clima", "calor y sequía"), ("riego", "riego")):   # el corte anterior mecanizado va dentro de la cosecha mecanizada (28-oct)
         out[f"le quitó: {et}"] = -float(np.average(a[k].fillna(0), weights=g.a))
     out["sin explicar"] = -float(np.average(g.se.fillna(0), weights=g.a))
     return pd.Series(out)

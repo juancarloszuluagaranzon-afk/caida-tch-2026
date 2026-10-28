@@ -71,6 +71,11 @@ S.index = q.index
 # calor y sequía, una sola causa (26-oct, pedido del jefe): se miden juntas en el modelo y sus aportes se suman sin traslaparse
 CAL_C, SEQ_C = "Días Tmax >32 °C", "Balance hídrico: sequía al final"
 S["Calor y sequía al final del ciclo"] = S[CAL_C] + S[SEQ_C]
+# cosecha mecanizada y corte anterior mecanizado, una sola causa (28-oct, pedido del usuario): el modelo las sigue midiendo por
+# separado (la cosecha de 2026 y la cepa que dejó el corte anterior) y aquí se suman cosecha por cosecha
+MEC_C, CA_C = "Cosecha mecanizada", "Corte anterior mecanizado"
+MEC_U = "Cosecha mecanizada (este corte y el anterior)"
+S[MEC_U] = S[MEC_C] + S[CA_C]
 ref = ds[ds.anio.between(2020, 2025) & ds.Mes.between(1, 9)]
 # el informe da los efectos en TCH: % del modelo × un TCH base (el % queda entre paréntesis)
 TN = float(np.average(ref.tch_calc, weights=ref.Area))   # TCH normal 2020-25 de Riopaila, enero a septiembre
@@ -102,17 +107,16 @@ N_DEFSR, N_MM, N_DEF = normal_mes("defsr_fin", ref_agua), normal_mes("mm_fin", r
 N_NF = normal_mes("nf_ciclo", ref_nf)
 
 # ---------------------------------------------------------------- causas: nombre, columna de aporte, grupo, texto
+EF_CA = (f"Soca que sale de un corte mecanizado después de manual: {tc(coef.loc['pm_new', 'efecto %'])}; de dos "
+         f"cortes mecanizados seguidos: {tc(coef.loc['pm_seg', 'efecto %'])} (2011-2026).")
 CAUSAS = [
-    {"id": "mecanica", "nombre": "Cosecha mecanizada", "col": "Cosecha mecanizada", "grupo": "Agronómico y operativo",
-     "mide": "Si la cosecha de 2026 fue mecanizada: la cosechadora daña la cepa y genera despoblación.",
+    {"id": "mecanica", "nombre": "Cosecha mecanizada", "col": MEC_U, "grupo": "Agronómico y operativo",
+     "mide": "Si la cosecha de 2026 fue mecanizada y si el corte que dejó esta soca también lo fue: la cosechadora daña la cepa y genera "
+             "despoblación, y la soca que deja rebrota menos. El modelo mide las dos por separado y aquí se suman.",
      "efecto": f"En 2026 la cosecha mecanizada rindió {tc(coef.loc['mec_2026', 'efecto %'], TMAN[2026])} frente a la manual en la misma "
                f"suerte (en 2020-25 la diferencia fue de "
                f"{es(max(coef.loc[f'mec_{y}', 'efecto %'] / 100 * TMAN[y] for y in range(2020, 2026)))} a "
-               f"{es(min(coef.loc[f'mec_{y}', 'efecto %'] / 100 * TMAN[y] for y in range(2020, 2026)))} TCH)."},
-    {"id": "corte-anterior", "nombre": "Corte anterior mecanizado", "col": "Corte anterior mecanizado", "grupo": "Agronómico y operativo",
-     "mide": "Si el corte que dejó esta soca fue mecanizado: la cepa queda aporreada y rebrota menos.",
-     "efecto": f"Soca que sale de un corte mecanizado después de manual: {tc(coef.loc['pm_new', 'efecto %'])}; de dos "
-               f"cortes mecanizados seguidos: {tc(coef.loc['pm_seg', 'efecto %'])} (2011-2026)."},
+               f"{es(min(coef.loc[f'mec_{y}', 'efecto %'] / 100 * TMAN[y] for y in range(2020, 2026)))} TCH). " + EF_CA},
     {"id": "corte-humedo", "nombre": "Cosecha con suelo húmedo", "col": "Corte anterior en suelo húmedo",
      "grupo": "No controlable",
      "mide": "Lluvia en el mes del corte anterior en la estación de la suerte. Si el corte se hizo con el suelo húmedo, la "
@@ -173,6 +177,7 @@ w = S.area[ok]
 for k in CAUSAS:
     k["t_ha"] = r1(np.average(S.loc[ok, k["col"]], weights=w), 2)
 sin_exp = r1(np.average(S.loc[ok, "Sin explicar"], weights=w), 2)
+PARTES_MEC = {"este corte": r1(np.average(S.loc[ok, MEC_C], weights=w), 2), "corte anterior": r1(np.average(S.loc[ok, CA_C], weights=w), 2)}
 # aclaración del nombre según lo que pasó en 2026 frente a lo normal, para que se entienda por qué suma o resta
 # (un incendio no suma TCH: suma que en 2026 hubo menos que lo normal). [si sumó, si restó]
 ACLARA = {"incendio": ["menos cosechas quemadas que lo normal", "más cosechas quemadas que lo normal"],
@@ -379,6 +384,8 @@ for e_ in range(1, 10):
         mo = smf.ols(f"{ind} ~ C(ste) + C(ym) + C(ant, Treatment('manual'))", data=d).fit()
         row += [r1(mo.params.get(f"C(ant, Treatment('manual'))[T.{k}]"), 3) for k in ("mecánica tras manual", "mecánica seguida")]
     sat_ed.append(row)
+sop["corte-anterior"]["efecto"], sop["corte-anterior"]["t_ha"] = EF_CA, PARTES_MEC["corte anterior"]
+sop["mecanica"]["partes"] = PARTES_MEC
 sop["corte-anterior"]["sat"] = sat_ed  # [edad, NDVI tras manual, NDVI seguida, NDMI tras manual, NDMI seguida]
 if SAT_RS is not None:
     fila = lambda d: [int(d.edad), d.indice, int(d.n_grupo), int(d.n_control), r1(d.cambio_grupo, 3), r1(d.cambio_control, 3),  # noqa: E731

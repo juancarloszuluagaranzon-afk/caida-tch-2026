@@ -165,7 +165,8 @@ const colSuerte = [
 function dato(id, s) {
   const mesN = MES[s.m - 1];
   switch (id) {
-    case 'mecanica': return s.tipo === 'Mecanizada' ? `Cosecha mecanizada${s.f ? ' el ' + fecha(s.f) : ''}` : 'Cosecha manual';
+    case 'mecanica': return (s.tipo === 'Mecanizada' ? `Cosecha mecanizada${s.f ? ' el ' + fecha(s.f) : ''}` : 'Cosecha manual') +
+      ` · corte anterior: ${ANT[s.ant] || s.ant}${s.ant_f ? ` (${mesAnio(s.ant_f)})` : ''}`;
     case 'corte-anterior': return `Corte anterior: ${ANT[s.ant] || s.ant}${s.ant_f ? ` (${mesAnio(s.ant_f)}${s.ant_tch ? ', ' + nf(s.ant_tch) + ' TCH' : ''})` : ''}`;
     case 'corte-humedo': return s.mmca == null ? 'Sin dato de lluvia del corte anterior' : `${nf(s.mmca, 0)} mm de lluvia en el mes del corte anterior${s.ant_f ? ' (' + mesAnio(s.ant_f) + ')' : ''}: suelo ${s.mmca >= 100 ? 'húmedo' : 'seco'} · EMA ${s.ema}`;
     case 'clima': return `${nf(s.d32, 0)} días >32 °C en los 30 días antes del corte (normal en ${mesN}: ${nf(s.d32n, 0)}); ` +
@@ -369,23 +370,28 @@ function soporte(id, el) {
   let html = '', specs = [];
   if (id === 'mecanica') {
     const h26 = sp.ha.find(r => r[0] === 2026) || [];
-    html = caja('Área con cosecha mecanizada (ha)', `Riopaila, por año de cosecha (2026 = enero a septiembre: ${nf(h26[1], 0)} ha de ${nf(h26[2], 0)} cosechadas)`) +
+    const pt = sp.partes || {};
+    html = (pt['este corte'] != null ? `<p>Esta causa suma la cosecha mecanizada de 2026 (${sg(-pt['este corte'], 2)} TCH) y la cepa que dejó el corte anterior mecanizado
+      (${sg(-pt['corte anterior'], 2)} TCH). El modelo mide las dos por separado y aquí se suman.</p>` : '') + caja('Área con cosecha mecanizada (ha)', `Riopaila, por año de cosecha (2026 = enero a septiembre: ${nf(h26[1], 0)} ha de ${nf(h26[2], 0)} cosechadas)`) +
       caja('Cuánto rindió la cosecha mecanizada frente a la manual (TCH)', 'Misma suerte, mismo año; efecto del modelo llevado a TCH con el TCH promedio de la cosecha manual de cada año') + seg('Cosecha') +
       (sp.alerta2027 ? satAlerta(sp.alerta2027) : '');
     specs = [{ x: sp.ha.map(r => r[0]), series: [{ valores: sp.ha.map(r => r[1]), colores: sp.ha.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 0 }], destacarX: sp.ha.length - 1, yfmt: v => nf(v, 0), anchoEt: 40 },
       { x: sp.brecha_tch.map(r => r[0]), series: [{ valores: sp.brecha_tch.map(r => r[1]), colores: sp.brecha_tch.map(r => r[0] === 2026 ? 'var(--quita)' : 'var(--hist)'), etiquetas: true, d: 1 }], alto: 200 }];
-  } else if (id === 'corte-anterior') {
-    const mx = Math.max(...sp.tabla.map(r => Math.abs(r[4])));
-    html = `<div><h3>Suertes cosechadas en 2026 frente a su propia historia 2015-25, según cómo fue el corte anterior (TCH)</h3>
-      ${divergentes(sp.tabla.map(r => ({ et: `${ANT[r[0]] || r[0]} · ${r[1]} cosechas · ${nf(r[2], 0)} ha`, v: r[4], color: r[0].startsWith('mec') ? 'var(--quita)' : r[4] < 0 ? 'var(--hist)' : 'var(--suma)' })), { max: mx })}
+  }
+  if (id === 'mecanica') {          // la cepa que deja el corte anterior: va dentro de la causa (28-oct)
+    const sp2 = C.soporte['corte-anterior'];
+    const mx = Math.max(...sp2.tabla.map(r => Math.abs(r[4])));
+    html += `<div><h3>La cepa que deja el corte anterior</h3><p>Esta causa incluye la soca que sale de un corte mecanizado (${sg(-sp2.t_ha, 2)} TCH de la causa). ${esc(sp2.efecto)}</p></div>
+      <div><h3>Suertes cosechadas en 2026 frente a su propia historia 2015-25, según cómo fue el corte anterior (TCH)</h3>
+      ${divergentes(sp2.tabla.map(r => ({ et: `${ANT[r[0]] || r[0]} · ${r[1]} cosechas · ${nf(r[2], 0)} ha`, v: r[4], color: r[0].startsWith('mec') ? 'var(--quita)' : r[4] < 0 ? 'var(--hist)' : 'var(--suma)' })), { max: mx })}
       <p class="sub" style="margin-top:6px">Cambio del TCH frente a la historia de cada suerte. Las que venían de un corte mecanizado cayeron casi el doble.</p></div>` +
       caja('El satélite lo ve: NDVI de la soca frente a la que salió de corte manual', 'Diferencia por mes de edad, misma suerte y mismo mes del año (3.500 ciclos 2019-2026)',
         leyenda([['var(--quita)', 'Corte anterior mecanizado, primera vez', 1], ['var(--mec)', 'Mecanizado repetido', 1]])) +
       caja('NDMI (humedad del follaje), igual', '', leyenda([['var(--quita)', 'Primera vez', 1], ['var(--mec)', 'Repetido', 1]])) +
-      (sp.cosecha2026 ? satCosecha(sp.cosecha2026) : '') + ejemplo();
-    const x = sp.sat.map(r => r[0] + ' m');
-    specs = [{ x, series: [{ tipo: 'linea', valores: sp.sat.map(r => r[1]), color: 'var(--quita)', d: 3 }, { tipo: 'linea', valores: sp.sat.map(r => r[2]), color: 'var(--mec)', dash: true, d: 3 }], yfmt: v => nf(v, 2), ejeX: 'meses de edad de la soca', alto: 210 },
-      { x, series: [{ tipo: 'linea', valores: sp.sat.map(r => r[3]), color: 'var(--quita)', d: 3 }, { tipo: 'linea', valores: sp.sat.map(r => r[4]), color: 'var(--mec)', dash: true, d: 3 }], yfmt: v => nf(v, 2), ejeX: 'meses de edad de la soca', alto: 210 }];
+      (sp2.cosecha2026 ? satCosecha(sp2.cosecha2026) : '') + ejemplo();
+    const x = sp2.sat.map(r => r[0] + ' m');
+    specs.push({ x, series: [{ tipo: 'linea', valores: sp2.sat.map(r => r[1]), color: 'var(--quita)', d: 3 }, { tipo: 'linea', valores: sp2.sat.map(r => r[2]), color: 'var(--mec)', dash: true, d: 3 }], yfmt: v => nf(v, 2), ejeX: 'meses de edad de la soca', alto: 210 },
+      { x, series: [{ tipo: 'linea', valores: sp2.sat.map(r => r[3]), color: 'var(--quita)', d: 3 }, { tipo: 'linea', valores: sp2.sat.map(r => r[4]), color: 'var(--mec)', dash: true, d: 3 }], yfmt: v => nf(v, 2), ejeX: 'meses de edad de la soca', alto: 210 });
   } else if (id === 'clima') {
     const ar = sp.area, pm = (m, d = 0) => ({ x: m.meses.map(r => MC[r[0] - 1]), series: [{ valores: m.meses.map(r => r[2]), color: 'var(--hist)', d }, { valores: m.meses.map(r => r[1]), color: 'var(--quita)', d }], ejeX: 'mes de cosecha' });
     html = `<div class="pila"><h3 style="margin:0">Una sola causa: calor y sequía al final del ciclo</h3>
@@ -746,7 +752,7 @@ function suelosHtml(enDoc) {
       nf(g.historia), nf(g.ppto), nf(g.real), `<b class="${clsImp(g.caida)}">${sg(g.caida)}</b>`, `<span class="${clsImp(g.t)}">${sg(g.t, 0)}</span>`])
       .concat(SU.sin_dato ? [['Sin dato', 'La suerte no está en el estudio de suelos', SU.sin_dato[0], nf(SU.sin_dato[1], 0), nf(SU.sin_dato[2]) + ' %', '', '', '', '', '', '']] : []),
     [2, 3, 4, 6, 7, 8, 9, 10]);
-  const CQ = [['cosecha mecanizada', 'Cosecha mecanizada'], ['corte anterior mecanizado', 'Corte anterior mecanizado'], ['suelo húmedo', 'Cosecha con suelo húmedo'],
+  const CQ = [['cosecha mecanizada', 'Cosecha mecanizada (incluye el corte anterior)'], ['suelo húmedo', 'Cosecha con suelo húmedo'],
     ['calor y sequía', 'Calor y sequía al final del ciclo'], ['riego', 'Riego aplicado'], ['nivel freático', 'Nivel freático']];
   const t2 = tbl(['Lo que le quitó o sumó (TCH)', ...G.map(g => g.g)],
     CQ.map(([k, et]) => [et, ...G.map(g => `<span class="${clsImp(g.quito[k])}">${sg(g.quito[k])}</span>`)])
@@ -988,7 +994,7 @@ function vSatelite() {
 
 // qué tipo de análisis es: la regresión, cómo se lee un efecto y qué no demuestra (Método y fuentes y Para la gerencia)
 function regresionHtml() {
-  const ca = C.causas.find(c => c.id === 'corte-anterior');
+  const ca = C.soporte['corte-anterior'];
   return `<p><b>Es una regresión.</b> Una regresión lineal múltiple con efectos fijos, sobre datos de panel: las mismas suertes medidas año tras año.
       Explica el TCH de cada cosecha (en logaritmo, por eso cada efecto sale en %) con 7.433 cosechas de Riopaila de 2011 a 2026.</p>
     <ul style="margin:6px 0;padding-left:20px">
@@ -1000,8 +1006,8 @@ function regresionHtml() {
     </ul>
     <p><b>Del efecto al aporte.</b> Aporte de una causa en una suerte = efecto × (su nivel en 2026 − el nivel normal). Los aportes de todas las causas más lo «sin explicar»
       suman exacto la caída de la suerte. El efecto en % se pasa a TCH con el TCH normal 2020-25 de Riopaila (${nf(C.tch_base || 118.4)} TCH).</p>
-    ${ca ? `<p><b>Ejemplo: corte anterior mecanizado.</b> ${esc(ca.efecto)} En 2026 hubo más área que salía de un corte mecanizado que lo normal; por eso esta causa
-      le quitó ${sg(-ca.t_ha, 2)} TCH a la caída.</p>` : ''}
+    ${ca && ca.efecto ? `<p><b>Ejemplo: corte anterior mecanizado.</b> ${esc(ca.efecto)} En 2026 hubo más área que salía de un corte mecanizado que lo normal; por eso esta parte
+      de la causa «Cosecha mecanizada» le quitó ${sg(-ca.t_ha, 2)} TCH a la caída.</p>` : ''}
     <p class="nota" style="margin:6px 0 0"><b>Qué tan confiable es.</b> Se probó prediciendo 2026 sin haberlo visto (pestaña «Prueba del modelo»): acierta el promedio y los grupos,
       pero suerte por suerte explica poco (R² de 0,21 a 0,29). Es una asociación medida con muchos años y suertes, no un experimento: dice cuánto se mueve el TCH
       cuando cambia cada causa, descontando las demás, pero no reemplaza una prueba de campo.</p>`;
@@ -1095,6 +1101,8 @@ function vGerencia() {
       <p class="sub" style="margin:6px 0 0">Normal = promedio 2020-25 en los mismos meses de cosecha; para agua y nivel freático, 2022-25 (años con registro); para labores, 2024-25.</p></section>
 
     <section><h3>Cosecha mecanizada: la causa más grande que depende de nosotros</h3>
+      ${mec.partes ? `<p><b>Le quitó ${ap('mecanica')} TCH a la caída</b>: ${sg(-mec.partes['este corte'])} por la cosecha mecanizada de 2026 y ${sg(-mec.partes['corte anterior'])}
+        por la cepa que dejó el corte anterior mecanizado. El modelo mide las dos por separado; aquí se presentan como una sola causa.</p>` : ''}
       <p>La cosechadora daña la cepa y genera despoblación. El área con cosecha mecanizada pasó de ${nf(haMec(2023), 0)} ha en 2023 a <b>${nf(haMec(2026), 0)} ha en 2026</b> (de enero a septiembre, de ${nf(haTot(2026), 0)} ha cosechadas),
         y en 2026 una suerte cosechada a máquina dio ${nf(-brT(2026))} TCH menos que a mano (entre 2020 y 2025 la diferencia iba de ${sg(Math.max(...br20T))} a ${sg(Math.min(...br20T))} TCH).
         La soca también lo paga: las suertes que venían de un corte mecanizado cayeron ${nf(-tablaCA('mecánica tras manual')[4])} TCH (primera vez)
@@ -1102,7 +1110,7 @@ function vGerencia() {
       ${tb(['Año', ...mec.anios.filter(r => r[0] >= 2019).map(r => r[0])], [['Área con cosecha mecanizada (ha)', ...mec.anios.filter(r => r[0] >= 2019).map(r => nf(haMec(r[0]), 0))],
         ['Mecanizada frente a manual (TCH)', ...mec.anios.filter(r => r[0] >= 2019).map(r => brT(r[0]) == null ? '—' : sg(brT(r[0])))]],
         mec.anios.filter(r => r[0] >= 2019).map((_, i) => i + 1))}
-      <p style="margin-top:10px"><b>La cepa que deja el corte anterior.</b> ${esc(causa('corte-anterior').efecto)}</p>
+      <p style="margin-top:10px"><b>La cepa que deja el corte anterior.</b> ${esc(ca.efecto)}</p>
       ${tb(['Cómo fue el corte anterior', 'Cosechas 2026', 'Área (ha)', 'Cambio del TCH frente a su historia (TCH)'],
         ca.tabla.map(r => [esc(ANT[r[0]] || r[0]), r[1], nf(r[2], 0), `<b class="${clsImp(r[4])}">${sg(r[4])}</b>`]), [1, 2, 3])}
       <p style="margin-top:10px"><b>El satélite lo ve.</b> Después del primer corte mecanizado la soca arranca con menos humedad en el follaje y más rebrote ralo.
