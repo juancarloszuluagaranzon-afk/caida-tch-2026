@@ -1,0 +1,31 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "informe",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8791",
+        "--directory",
+        "../web"
+      ],
+      "port": 8791
+    },
+    {
+      "name": "app-modelo",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8795",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "C:/Users/Agr349/modelo-caida-tch/web"
+      ],
+      "port": 8795
+    }
+  ]
+}

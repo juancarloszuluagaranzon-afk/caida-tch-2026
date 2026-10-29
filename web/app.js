@@ -9,6 +9,7 @@ let SU = null;   // grupo de humedad del suelo de lo cosechado en 2026 (suelos.j
 let DV = null, AFO = {};   // aforo frente al óptimo de la variedad (desarrollo.json, desarrollo_optimo.py); opcional
 let BL = null;             // balance hídrico de Cenicaña y riego aplicado en mm (balance.json, balance_riego.py); opcional
 let SC = null;             // curva satelital del ciclo 2026 frente a la normal propia y falta de agua por edad (satciclo.json, satelite_ciclo.py); opcional
+let RE = null;             // falta de agua y riego por etapa del cultivo, TCH, sacarosa y azúcar (riego_etapas.json, riego_por_edad.py); opcional
 let RF = null;             // R² del PPTO y del aforo para comparar con el del modelo (referencias.json, referencias_r2.py); opcional
 let vistaActual = '';
 
@@ -405,7 +406,8 @@ function soporte(id, el) {
       <p class="nota" style="margin:0">El riego cubre parte de la falta de agua y va aparte, en «Riego aplicado», porque es lo que se puede manejar.</p></div>` +
       caja('Días con más de 32 °C en los 30 días antes del corte', 'Promedio de las cosechas de cada mes', leyMes) +
       caja('Días con más de 32 °C por mes · EMA La Paila', 'Desde julio de 2024; la línea es el promedio 2011-25 de ese mes', leyenda([['var(--quita)', 'Ese mes'], ['var(--ink-2)', 'Normal', 1]])) +
-      caja('Falta de agua sin riego del mes 8 a la cosecha (mm)', 'Promedio de las cosechas de cada mes; normal = 2022-25 (años con registro de riego)', leyMes);
+      caja('Falta de agua sin riego del mes 8 a la cosecha (mm)', 'Promedio de las cosechas de cada mes; normal = 2022-25 (años con registro de riego)', leyMes) +
+      (RE ? `<div>${etapasDoc()}</div>` : '');
     specs = [{ ...pm(sp.calor), titulo: 'días' }, { x: sp.calor.ema.map(r => mesAnio(r[0])), series: [{ valores: sp.calor.ema.map(r => r[1]), color: 'var(--quita)', d: 0 }, { tipo: 'linea', valores: sp.calor.ema.map(r => r[2]), color: 'var(--ink-2)', dash: true, puntos: false }], anchoEt: 56 },
       { ...pm(sp.sequia), titulo: 'mm' }];
   } else if (id === 'lluvia') {
@@ -480,6 +482,46 @@ function balanceDoc() {
     <p class="sub" style="margin:4px 0 0">Lo que no demuestra: el balance es por estación y por mes (no por suerte), el consumo de la caña es un supuesto simple, el riego de 2026 llega
       hasta ${fecha(BL.riego_hasta)}, desde 2024 cada riego aparece con menos mm (posible cambio de registro, por confirmar con Recursos Hídricos) y se riega
       primero donde más falta hace, lo que puede hacer ver menor el efecto del riego. Efectos en TCH sobre el TCH normal 2020-25 (${nf(BL.tch_base)}).</p>`;
+}
+
+// el agua por etapa del cultivo frente a la ventana crítica de Cenicaña (riego_etapas.json, riego_por_edad.py); causa clima y gerencia
+function etapasDoc() {
+  if (!RE) return '';
+  const et = n => n.replace(/^0-4,5 /, '0-4,5 meses · ').replace(/^4,5-8,5 /, '4,5-8,5 meses · ').replace(/^> 8,5 /, 'más de 8,5 meses · ');
+  const pv = p => p < 0.001 ? 'p < 0,001' : 'p ' + nf(p, p < 0.05 ? 3 : 2);
+  const ef = (v, p, d, u) => p < 0.05 ? `<b class="${clsImp(v)}">${sg(v, d)}${u}</b> <span class="sub">(${pv(p)})</span>` : `<span class="sub">${sg(v, d)}${u} (no confiable, ${pv(p)})</span>`;
+  const tbl = (cab, filas, num) => `<div class="tabla"><table><thead><tr>${cab.map((c, i) => `<th class="${num.includes(i) ? 'n' : ''}">${c}</th>`).join('')}</tr></thead>
+    <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${num.includes(i) ? 'n' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const e = RE.etapas, gc = e[1], fo = e[0], ma = e[2];
+  const ult = RE.efectos[3], ap = RE.aporte, apU = ap[3], apG = ap[1];
+  const tot = ap.reduce((a, r) => a + r[3], 0), totAz = ap.reduce((a, r) => a + r[4], 0);
+  const an = RE.anios, a26 = an.find(r => r[0] === 2026), prev = an.filter(r => r[0] >= 2021 && r[0] <= 2025).map(r => r[2]);
+  return `<p style="margin-top:10px"><b>El agua por etapa del cultivo.</b> Cenicaña divide el ciclo en tres etapas: de 0 a 4,5 meses (formación y macollamiento: soporta estrés leve),
+      de 4,5 a 8,5 meses (gran crecimiento: ahí se define la mayor parte del peso y el estrés hídrico hace daño que no se recupera) y de 8,5 meses en adelante (maduración:
+      un estrés moderado es deseable para acumular sacarosa). Con el consolidado de riegos (${nf(RE.riegos, 0)} riegos de ${fecha(RE.desde)} a ${fecha(RE.hasta)}) y el balance
+      de Cenicaña se midió la falta de agua y el riego de cada etapa en ${nf(RE.cosechas, 0)} cosechas (${nf(RE.ha, 0)} ha) cuyo ciclo entero está en el registro.</p>
+    ${tbl(['Etapa', 'Falta de agua (mm)', 'Riego (mm)', '% de la falta', '% del riego', 'Riego frente a la falta'],
+      e.map(r => [et(r[0]), nf(r[1], 0), nf(r[2], 0), nf(r[3], 0) + ' %', `<b>${nf(r[4], 0)} %</b>`, nf(r[5], 0) + ' %']), [1, 2, 3, 4, 5])}
+    <p style="margin-top:8px">El riego ya se prioriza como dice Cenicaña: la etapa de gran crecimiento recibe el ${nf(gc[4], 0)} % del riego aunque tiene el ${nf(gc[3], 0)} % de la falta de agua.
+      La formación se cubre en un ${nf(fo[5], 0)} % y la maduración en un ${nf(ma[5], 0)} %; en los 2 últimos meses antes del corte faltan en promedio ${nf(RE.ult[0], 0)} mm y se riegan ${nf(RE.ult[1], 0)}.
+      En 2026 la etapa de gran crecimiento recibió ${nf(a26[2], 0)} mm (${nf(Math.min(...prev), 0)} a ${nf(Math.max(...prev), 0)} mm en 2021-25).</p>
+    <p>Cada suerte frente a sí misma, con los controles del modelo, lo que cuesta cada 100 mm de falta que el riego no cubrió:</p>
+    ${tbl(['Etapa', 'TCH', 'Sacarosa (puntos % caña)', 'Azúcar por ha'],
+      RE.efectos.map(r => [et(r[0]), ef(r[1], r[2], 1, ' %'), ef(r[3], r[4], 2, ''), ef(r[5], r[6], 1, ' %')]), [1, 2, 3])}
+    <p style="margin-top:8px">En gran crecimiento la falta de agua es lo que más cuesta: baja la caña, la sacarosa no compensa y se pierde azúcar. En la maduración temprana el estrés
+      sube algo la sacarosa y el azúcar por ha queda igual, como dice Cenicaña. En los 2 últimos meses la sacarosa sube ${sg(ult[3], 2)} puntos, pero la caña baja ${sg(ult[1], 1)} %
+      y el azúcar por ha ${sg(ult[5], 1)} %: el agostamiento, como se ha hecho, cambia toneladas por sacarosa y sale perdiendo un poco de azúcar.</p>
+    <p><b>Qué le aportó a la caída de 2026</b> (${nf(RE.aporte_n[0], 0)} cosechas ene-sep, ${nf(RE.aporte_n[1], 0)} ha; falta sin cubrir de 2026 frente a la de 2021-25 en los mismos meses):</p>
+    ${tbl(['Etapa', 'Sin cubrir 2021-25 (mm)', 'Sin cubrir 2026 (mm)', 'Aporte (TCH)', 'Aporte en azúcar por ha'],
+      ap.map(r => [et(r[0]), nf(r[1], 0), nf(r[2], 0), `<b class="${clsImp(r[3])}">${sg(r[3], 1)}</b>`, `<span class="${clsImp(r[4])}">${sg(r[4], 1)} %</span>`])
+        .concat([['<b>Total</b>', '', '', `<b class="${clsImp(tot)}">${sg(tot, 1)}</b>`, `<b class="${clsImp(totAz)}">${sg(totAz, 1)} %</b>`]]), [1, 2, 3, 4])}
+    <p style="margin-top:8px">El riego de 2026 no falló en la etapa crítica: la de gran crecimiento quedó mejor cubierta que lo normal (${sg(apG[3], 1)} TCH). Lo que se perdió por agua
+      fue al final: en los 2 últimos meses quedaron ${nf(apU[2], 0)} mm sin cubrir frente a ${nf(apU[1], 0)} normales (${sg(apU[3], 1)} TCH). En azúcar casi se compensa
+      (${sg(totAz, 1)} % de azúcar por ha en total): parte de lo que la sequía del final le quita al TCH vuelve como sacarosa. Es el mismo orden de la sequía y el riego del modelo;
+      es respaldo de esa causa, no una causa más (entrarlo contaría el agua dos veces).</p>
+    <p class="sub" style="margin:4px 0 0">Lo que no demuestra: no separa el agostamiento planeado (dejar de regar a propósito) de la falta de riego por capacidad; el madurante no está en
+      los controles y también sube la sacarosa; la falta de agua es un balance mensual por estación (0,8 × evaporación − lluvia) y los «2 últimos meses» se cuentan por mes;
+      no dice cuántos días de agostamiento son los mejores.</p>`;
 }
 
 // por qué el número de corte sumó en 2026: cada suerte frente al corte promedio de su propia historia (lo usan la causa y la gerencia)
@@ -1143,7 +1185,8 @@ function vGerencia() {
       <p><b>Cosecha con suelo húmedo.</b> ${nf(chA && chA.ha ? (chA.ha.find(r => r[0] === 2026) || [])[1] : haArea(s => s.mmca != null && s.mmca >= 100), 0)} ha cosechadas en 2026 venían de un corte hecho en un mes con 100 mm de lluvia
         o más${humHa2425 != null ? `, contra ${nf(humHa2425, 0)} ha por año en 2024-25 (años completos)` : ''}. ${esc(causa('corte-humedo').efecto)}
         Roturar o fertilizar con el suelo húmedo (lluvia en los 5 días antes) se probó y no mostró un efecto confiable.</p>
-      ${balanceDoc()}</section>
+      ${balanceDoc()}
+      ${etapasDoc()}</section>
 
     ${satDoc()}
 
@@ -1204,6 +1247,7 @@ function vGerencia() {
         ['NDVI, NDRE y NDMI', 'Sentinel-2 por Earth Engine, promedio mensual por suerte', '2019'],
         ['Balance hídrico (soporte)', 'Clima mensual de Cenicaña por estación: lluvia y evaporación', '1993'],
         ['Riego aplicado en mm (soporte)', 'Consolidado de riegos del balance hídrico', '2021'],
+        ...(RE ? [['Riego y falta de agua por etapa del cultivo (soporte)', `Consolidado de riegos hasta ${fecha(RE.hasta)} y clima mensual de Cenicaña`, '2021']] : []),
         ['Aforo (población, altura, diámetro)', 'Base de aforos y tabla de óptimos por variedad', '2023'],
         ['PPTO, zona, hacienda y fecha de corte', 'Maestro de Suertes 2026 (TCH PPTO, columna AG)', '2026']], [2])}
       <p style="margin-top:8px">El modelo es una regresión del TCH (en logaritmo) sobre 7.433 cosechas de Riopaila de 2011 a 2026, ponderada por área, con un nivel propio para
@@ -1443,9 +1487,9 @@ window.addEventListener('hashchange', () => ruta());
 
 Promise.all(['resumen', 'causas', 'suertes', 'fichas', 'validacion', 'escenas_bloque3501'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => {
   if (!r.ok) throw new Error(`${n}.json: ${r.status}`); return r.json();
-})).concat(['desarrollo', 'balance', 'referencias', 'suelos', 'humedad', 'satciclo'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null))))
-  .then(([r, c, s, f, v, e, d, b, rf, su, hu, sc]) => {
-    R = r; C = c; S = s; F = f; V = v; E = e; DV = d; BL = b; RF = rf; SU = su; HU = hu; SC = sc;
+})).concat(['desarrollo', 'balance', 'referencias', 'suelos', 'humedad', 'satciclo', 'riego_etapas'].map(n => fetch(`data/${n}.json`, { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).catch(() => null))))
+  .then(([r, c, s, f, v, e, d, b, rf, su, hu, sc, re]) => {
+    R = r; C = c; S = s; F = f; V = v; E = e; DV = d; BL = b; RF = rf; SU = su; HU = hu; SC = sc; RE = re;
     if (DV) DV.filas.forEach(x => AFO[x.s + '|' + x.m] = x);
     ruta();
   })
