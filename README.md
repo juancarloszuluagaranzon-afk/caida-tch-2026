@@ -10,7 +10,8 @@ Por qué cayó el TCH de lo cosechado en Riopaila de enero a septiembre de 2026,
 | --- | --- |
 | `Caida TCH 2026 - programas/` | Programas en Python y `datos intermedios/`. Su `CLAUDE.md` es el traspaso completo: reglas, cifras vigentes, la cadena de programas en orden y las fuentes. |
 | `web/` | El informe en línea (antes `Caida TCH 2026 - programas/tablero_web/`). |
-| `salidas/` | Soporte del modelo v3, matriz ponderada v3, validación v3 y análisis del madurante, en Excel. |
+| `CEREBRO.md` | Índice para consultar el proyecto: respuestas rápidas, dónde está cada cifra y lo que el modelo no demuestra. Empezar por aquí. |
+| `salidas/` | Todos los Excel y PDF de resultados (lista en `CEREBRO.md`). |
 | `documento_gerente/` | Texto del documento para el gerente, en Markdown. |
 | `presentacion/` | Las 11 láminas de la presentación (formato Slides de claude.ai) y sus imágenes. |
 | `tablero_claude/` | Página y datos del tablero de claude.ai. |
